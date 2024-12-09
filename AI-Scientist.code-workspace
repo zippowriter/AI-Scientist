@@ -1,0 +1,30 @@
+{
+    "folders": [
+        {
+            "path": ".",
+            "name": "AI-Scientist"
+        }
+    ],
+    "settings": {
+        "python.analysis.addImport.exactMatchOnly": false,
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.completeFunctionParens": false,
+        "python.analysis.extraPaths": [ ],
+        "python.analysis.importFormat": "absolute",
+        "python.analysis.indexing": true,
+        "python.analysis.typeCheckingMode": "basic",
+        "python.globalModuleInstallation": true,
+        "python.testing.pytestEnabled": true,
+
+        "[python]": {
+            "editor.codeActionsOnSave": {
+                "source.organizeImports.ruff": "explicit",
+            },
+            "editor.tabSize": 4,
+            "editor.rulers": [
+                88
+            ],
+            "editor.defaultFormatter": "charliermarsh.ruff",
+        },
+    }
+}
