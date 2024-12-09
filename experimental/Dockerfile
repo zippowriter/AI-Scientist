@@ -70,16 +70,16 @@ RUN python data/enwik8/prepare.py && \
 # Set up baseline runs
 RUN for dir in templates/*/; do \
     if [ -f "${dir}experiment.py" ]; then \
-        cd "${dir}" || continue; \
-        python experiment.py --out_dir run_0 && \
-        python plot.py; \
-        cd /app/AI-Scientist || exit; \
+    cd "${dir}" || continue; \
+    python experiment.py --out_dir run_0 && \
+    python plot.py; \
+    cd /app/AI-Scientist || exit; \
     fi \
-done
+    done
 
 # Create entrypoint script
 RUN printf '#!/bin/bash\n\
-python launch_scientist.py "$@"\n' > /app/entrypoint.sh && \
+    python launch_scientist.py "$@"\n' > /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
 # Set the entrypoint
