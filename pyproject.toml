@@ -23,7 +23,22 @@ datasets = "<3.1"
 tiktoken = "^0.8.0"
 wandb = "^0.19.0"
 tqdm = "^4.67.1"
+npeet = {git = "https://github.com/gregversteeg/NPEET.git", rev = "8b0d9485423f74e5eb199324cf362765596538d3"}
+einops = "^0.8.0"
+torchvision = "^0.20.1"
 
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.2"
+pyright = "^1.1.390"
+pytest = "^8.3.4"
+taskipy = "^1.14.1"
+
+[tool.taskipy.tasks]
+format = "ruff format . --config ruff.toml"
+lint = "ruff check . --config ruff.toml"
+typecheck = "pyright ."
+test = "pytest"
+ci = "task format && task lint && task typecheck && task test"
 
 [build-system]
 requires = ["poetry-core"]
