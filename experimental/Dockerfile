@@ -1,11 +1,8 @@
 # Use Python 3.11 as the base image
-FROM python:3.11-bullseye
+FROM python:3.11-bullseye as base
 
 # Avoid prompts from apt
 ENV DEBIAN_FRONTEND=noninteractive
-
-# Set working directory
-WORKDIR /app
 
 # Install system dependencies including texlive-full
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,59 +24,57 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     texlive-full=2020.20210202-3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip==24.2
+# Env vars
+ENV PYTHONIOENCODING=utf-8 \
+    LANG=C.UTF-8
+# Python envs
+ENV PYTHONUNBUFFERED=1 \
+    # Disable writing bytecode (.pyc)
+    PYTHONDONTWRITEBYTECODE=1 \
+    # pip
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_ROOT_USER_ACTION=ignore \
+    # Poetry
+    POETRY_HOME=/opt/poetry \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1
+ENV PATH="${POETRY_HOME}/bin:${PATH}"
+RUN python -m pip install --upgrade pip setuptools wheel
 
-# Install Python packages
-RUN pip install --no-cache-dir \
-    anthropic==0.34.0 \
-    aider-chat==0.50.1 \
-    backoff==2.2.1 \
-    openai==1.40.6 \
-    matplotlib==3.9.2 \
-    pypdf==4.3.1 \
-    pymupdf4llm==0.0.10 \
-    torch==2.4.0 \
-    numpy==1.26.4 \
-    transformers==4.44.0 \
-    datasets==2.21.0 \
-    tiktoken==0.7.0 \
-    wandb==0.17.7 \
-    tqdm==4.66.5 \
-    scikit-learn==1.5.1 \
-    einops==0.8.0
-
-# Clone and install NPEET with a specific commit
-RUN git clone https://github.com/gregversteeg/NPEET.git
-WORKDIR /app/NPEET
-RUN git checkout 8b0d9485423f74e5eb199324cf362765596538d3 \
-    && pip install .
-
-# Clone the AI-Scientist repository
+# Set working directory
 WORKDIR /app
-RUN git clone https://github.com/SakanaAI/AI-Scientist.git
+# Install Poetry
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN curl -sSL https://install.python-poetry.org | python -
 
-# Set working directory to AI-Scientist
-WORKDIR /app/AI-Scientist
+FROM base as app
+COPY ai_scientist ai_scientist
+COPY data data
+COPY templates templates
+COPY pyproject.toml .
+COPY poetry.lock .
+
+RUN poetry --version && poetry install --only main
 
 # Prepare NanoGPT data
-RUN python data/enwik8/prepare.py && \
-    python data/shakespeare_char/prepare.py && \
-    python data/text8/prepare.py
+RUN poetry run python data/enwik8/prepare.py && \
+    poetry run python data/shakespeare_char/prepare.py && \
+    poetry run python data/text8/prepare.py
 
 # Set up baseline runs
 RUN for dir in templates/*/; do \
     if [ -f "${dir}experiment.py" ]; then \
     cd "${dir}" || continue; \
-    python experiment.py --out_dir run_0 && \
-    python plot.py; \
-    cd /app/AI-Scientist || exit; \
+    poetry run python experiment.py --out_dir run_0 && \
+    poetry run python plot.py; \
+    cd /app || exit; \
     fi \
     done
 
 # Create entrypoint script
 RUN printf '#!/bin/bash\n\
-    python launch_scientist.py "$@"\n' > /app/entrypoint.sh && \
+    poetry run python launch_scientist.py "$@"\n' > /app/entrypoint.sh && \
     chmod +x /app/entrypoint.sh
 
 # Set the entrypoint
