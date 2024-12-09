@@ -102,7 +102,7 @@ class NoiseScheduler:
             raise ValueError(f"Unknown beta schedule: {beta_schedule}")
 
         self.alphas = 1.0 - self.betas
-        self.alphas_cumprod = torch.cumprod(self.alphas, axis=0).to(device)
+        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0).to(device)
         self.alphas_cumprod_prev = F.pad(
             self.alphas_cumprod[:-1], (1, 0), value=1.0
         ).to(device)
