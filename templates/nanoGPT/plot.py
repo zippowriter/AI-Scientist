@@ -6,6 +6,7 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 # LOAD FINAL RESULTS:
 datasets = ["shakespeare_char", "enwik8", "text8"]
 folders = os.listdir("./")
