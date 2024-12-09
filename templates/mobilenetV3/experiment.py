@@ -3,14 +3,16 @@ import json
 import os
 import random
 import time
+
 from dataclasses import dataclass
 from functools import partial
-from typing import Callable, List, Optional, Union, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -319,8 +321,10 @@ def mobilenet_v3_small(pretrained=False, progress=True, **kwargs):
 
     if pretrained:
         # Load the torchvision model with pretrained weights
-        from torchvision.models import mobilenet_v3_small as tv_mobilenet_v3_small
-        from torchvision.models import MobileNet_V3_Small_Weights
+        from torchvision.models import (
+            MobileNet_V3_Small_Weights,
+            mobilenet_v3_small as tv_mobilenet_v3_small,
+        )
 
         # Check for number of classes
         if kwargs.get('num_classes', 1000) != 1000:
