@@ -3,13 +3,15 @@ import argparse
 import json
 import os
 import random
+
 from itertools import permutations
 from typing import Set
 
 import numpy as np
 import torch
+
 from einops import rearrange, repeat
-from torch import nn, Tensor
+from torch import Tensor, nn
 from torch.utils.data import IterableDataset
 
 
