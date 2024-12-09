@@ -6,9 +6,14 @@ encoder and decoder and some other related info.
 """
 import os
 import pickle
+import zipfile
 
 import numpy as np
 import requests
+
+
+def encode(s):
+    return [stoi[c] for c in s]  # encoder: take a string, output a list of integers
 
 
 # download the enwik8 dataset
@@ -20,27 +25,25 @@ if not os.path.exists(input_file_path):
         f.write(r.content)
 
     # unzip the enwik8 dataset
-    import zipfile
-    with zipfile.ZipFile(os.path.join(os.path.dirname(__file__), 'enwik8.zip'), 'r') as zip_ref:
+
+    with zipfile.ZipFile(
+        os.path.join(os.path.dirname(__file__), "enwik8.zip"), "r"
+    ) as zip_ref:
         zip_ref.extractall(os.path.dirname(__file__))
 
-with open(input_file_path, 'r', encoding='latin-1') as f:
+with open(input_file_path, "r", encoding="latin-1") as f:
     data = f.read()
 print(f"length of dataset in characters: {len(data):,}")
 
 # get all the unique characters that occur in this text
 chars = sorted(list(set(data)))
 vocab_size = len(chars)
-print("all the unique characters:", ''.join(chars))
+print("all the unique characters:", "".join(chars))
 print(f"vocab size: {vocab_size:,}")
 
 # create a mapping from characters to integers
-stoi = { ch:i for i,ch in enumerate(chars) }
-itos = { i:ch for i,ch in enumerate(chars) }
-def encode(s):
-    return [stoi[c] for c in s] # encoder: take a string, output a list of integers
-def decode(l):
-    return ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
+stoi = {ch: i for i, ch in enumerate(chars)}
+itos = {i: ch for i, ch in enumerate(chars)}
 
 # create the train, validation, and test splits
 n = len(data)

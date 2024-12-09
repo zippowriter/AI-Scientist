@@ -11,6 +11,10 @@ import numpy as np
 import requests
 
 
+def encode(s):
+    return [stoi[c] for c in s]  # encoder: take a string, output a list of integers
+
+
 # download the text8 dataset
 input_file_path = os.path.join(os.path.dirname(__file__), 'text8')
 if not os.path.exists(input_file_path):
@@ -36,11 +40,7 @@ print(f"vocab size: {vocab_size:,}")
 
 # create a mapping from characters to integers
 stoi = { ch:i for i,ch in enumerate(chars) }
-itos = { i:ch for i,ch in enumerate(chars) }
-def encode(s):
-    return [stoi[c] for c in s] # encoder: take a string, output a list of integers
-def decode(l):
-    return ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
+itos = {i: ch for i, ch in enumerate(chars)}
 
 # create the train, validation, and test splits
 n = len(data)
