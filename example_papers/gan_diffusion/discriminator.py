@@ -1,5 +1,5 @@
-import torch
 from torch import nn
+
 
 class Discriminator(nn.Module):
     def __init__(self, input_dim=2, hidden_dim=256, hidden_layers=6):

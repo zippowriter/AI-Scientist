@@ -2,23 +2,25 @@
 
 import argparse
 import json
-import time
 import os.path as osp
-import numpy as np
-from tqdm.auto import tqdm
-import npeet.entropy_estimators as ee
-import pickle
 import pathlib
-
-import torch
-from torch import nn
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from ema_pytorch import EMA
+import pickle
+import time
 
 import datasets
-from discriminator import Discriminator
+import npeet.entropy_estimators as ee
+import numpy as np
+import torch
+
+from torch import nn
+from torch.nn import functional as F
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
+
+from .discriminator import Discriminator
+from .ema_pytorch import EMA
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -51,10 +53,10 @@ class ResidualBlock(nn.Module):
 
 class MLPDenoiser(nn.Module):
     def __init__(
-            self,
-            embedding_dim: int = 128,
-            hidden_dim: int = 256,
-            hidden_layers: int = 3,
+        self,
+        embedding_dim: int = 128,
+        hidden_dim: int = 256,
+        hidden_layers: int = 3,
     ):
         super().__init__()
         self.time_mlp = SinusoidalEmbedding(embedding_dim)
@@ -77,42 +79,58 @@ class MLPDenoiser(nn.Module):
         return self.network(emb)
 
 
-class NoiseScheduler():
+class NoiseScheduler:
     def __init__(
-            self,
-            num_timesteps=1000,
-            beta_start=0.0001,
-            beta_end=0.02,
-            beta_schedule="linear",
+        self,
+        num_timesteps=1000,
+        beta_start=0.0001,
+        beta_end=0.02,
+        beta_schedule="linear",
     ):
         self.num_timesteps = num_timesteps
         if beta_schedule == "linear":
             self.betas = torch.linspace(
-                beta_start, beta_end, num_timesteps, dtype=torch.float32).to(device)
+                beta_start, beta_end, num_timesteps, dtype=torch.float32
+            ).to(device)
         elif beta_schedule == "quadratic":
-            self.betas = (torch.linspace(
-                beta_start ** 0.5, beta_end ** 0.5, num_timesteps, dtype=torch.float32) ** 2).to(device)
+            self.betas = (
+                torch.linspace(
+                    beta_start**0.5, beta_end**0.5, num_timesteps, dtype=torch.float32
+                )
+                ** 2
+            ).to(device)
         else:
             raise ValueError(f"Unknown beta schedule: {beta_schedule}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0).to(device)
-        self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.).to(device)
+        self.alphas_cumprod_prev = F.pad(
+            self.alphas_cumprod[:-1], (1, 0), value=1.0
+        ).to(device)
 
         # required for self.add_noise
-        self.sqrt_alphas_cumprod = (self.alphas_cumprod ** 0.5).to(device)
-        self.sqrt_one_minus_alphas_cumprod = ((1 - self.alphas_cumprod) ** 0.5).to(device)
+        self.sqrt_alphas_cumprod = (self.alphas_cumprod**0.5).to(device)
+        self.sqrt_one_minus_alphas_cumprod = ((1 - self.alphas_cumprod) ** 0.5).to(
+            device
+        )
 
         # required for reconstruct_x0
         self.sqrt_inv_alphas_cumprod = torch.sqrt(1 / self.alphas_cumprod).to(device)
         self.sqrt_inv_alphas_cumprod_minus_one = torch.sqrt(
-            1 / self.alphas_cumprod - 1).to(device)
+            1 / self.alphas_cumprod - 1
+        ).to(device)
 
         # required for q_posterior
-        self.posterior_mean_coef1 = self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1. - self.alphas_cumprod).to(
-            device)
-        self.posterior_mean_coef2 = ((1. - self.alphas_cumprod_prev) * torch.sqrt(self.alphas) / (
-                1. - self.alphas_cumprod)).to(device)
+        self.posterior_mean_coef1 = (
+            self.betas
+            * torch.sqrt(self.alphas_cumprod_prev)
+            / (1.0 - self.alphas_cumprod).to(device)
+        )
+        self.posterior_mean_coef2 = (
+            (1.0 - self.alphas_cumprod_prev)
+            * torch.sqrt(self.alphas)
+            / (1.0 - self.alphas_cumprod)
+        ).to(device)
 
     def reconstruct_x0(self, x_t, t, noise):
         s1 = self.sqrt_inv_alphas_cumprod[t]
@@ -133,7 +151,11 @@ class NoiseScheduler():
         if t == 0:
             return 0
 
-        variance = self.betas[t] * (1. - self.alphas_cumprod_prev[t]) / (1. - self.alphas_cumprod[t])
+        variance = (
+            self.betas[t]
+            * (1.0 - self.alphas_cumprod_prev[t])
+            / (1.0 - self.alphas_cumprod[t])
+        )
         variance = variance.clip(1e-20)
         return variance
 
@@ -171,7 +193,12 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=3e-4)
     parser.add_argument("--num_timesteps", type=int, default=100)
     parser.add_argument("--num_train_steps", type=int, default=10000)
-    parser.add_argument("--beta_schedule", type=str, default="quadratic", choices=["linear", "quadratic"])
+    parser.add_argument(
+        "--beta_schedule",
+        type=str,
+        default="quadratic",
+        choices=["linear", "quadratic"],
+    )
     parser.add_argument("--embedding_dim", type=int, default=128)
     parser.add_argument("--hidden_size", type=int, default=256)
     parser.add_argument("--hidden_layers", type=int, default=3)
@@ -185,7 +212,9 @@ if __name__ == "__main__":
 
     for dataset_name in ["circle", "dino", "line", "moons"]:
         dataset = datasets.get_dataset(dataset_name, n=100000)
-        dataloader = DataLoader(dataset, batch_size=config.train_batch_size, shuffle=True)
+        dataloader = DataLoader(
+            dataset, batch_size=config.train_batch_size, shuffle=True
+        )
 
         model = MLPDenoiser(
             embedding_dim=config.embedding_dim,
@@ -194,9 +223,13 @@ if __name__ == "__main__":
         ).to(device)
         discriminator = Discriminator().to(device)
         ema_model = EMA(model, beta=0.995, update_every=10).to(device)
-        d_optimizer = torch.optim.AdamW(discriminator.parameters(), lr=config.learning_rate * 0.5)
+        d_optimizer = torch.optim.AdamW(
+            discriminator.parameters(), lr=config.learning_rate * 0.5
+        )
 
-        noise_scheduler = NoiseScheduler(num_timesteps=config.num_timesteps, beta_schedule=config.beta_schedule)
+        noise_scheduler = NoiseScheduler(
+            num_timesteps=config.num_timesteps, beta_schedule=config.beta_schedule
+        )
 
         optimizer = torch.optim.AdamW(
             model.parameters(),
@@ -218,9 +251,11 @@ if __name__ == "__main__":
                     break
                 batch = batch[0].to(device)
                 noise = torch.randn(batch.shape).to(device)
-                timesteps = torch.randint(
-                    0, noise_scheduler.num_timesteps, (batch.shape[0],)
-                ).long().to(device)
+                timesteps = (
+                    torch.randint(0, noise_scheduler.num_timesteps, (batch.shape[0],))
+                    .long()
+                    .to(device)
+                )
 
                 noisy = noise_scheduler.add_noise(batch, noise, timesteps)
                 noise_pred = model(noisy, timesteps)
@@ -231,8 +266,12 @@ if __name__ == "__main__":
                 d_optimizer.zero_grad()
                 real_output = discriminator(batch)
                 fake_output = discriminator(noisy.detach())
-                d_loss_real = F.binary_cross_entropy_with_logits(real_output, real_labels)
-                d_loss_fake = F.binary_cross_entropy_with_logits(fake_output, fake_labels)
+                d_loss_real = F.binary_cross_entropy_with_logits(
+                    real_output, real_labels
+                )
+                d_loss_fake = F.binary_cross_entropy_with_logits(
+                    fake_output, fake_labels
+                )
                 # Gradient Penalty
                 alpha = torch.rand(batch.size(0), 1).to(device)
                 interpolates = alpha * batch + (1 - alpha) * noisy.detach()
@@ -284,9 +323,11 @@ if __name__ == "__main__":
         for batch in dataloader:
             batch = batch[0].to(device)
             noise = torch.randn(batch.shape).to(device)
-            timesteps = torch.randint(
-                0, noise_scheduler.num_timesteps, (batch.shape[0],)
-            ).long().to(device)
+            timesteps = (
+                torch.randint(0, noise_scheduler.num_timesteps, (batch.shape[0],))
+                .long()
+                .to(device)
+            )
             noisy = noise_scheduler.add_noise(batch, noise, timesteps)
             noise_pred = model(noisy, timesteps)
             loss = F.mse_loss(noise_pred, noise)

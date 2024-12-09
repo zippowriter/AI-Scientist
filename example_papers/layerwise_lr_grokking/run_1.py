@@ -1,15 +1,18 @@
-import argparse
 import abc
+import argparse
+import json
+import os
 import random
+
 from itertools import permutations
 from typing import Set
-import os
-import json
+
 import numpy as np
-from einops import rearrange, repeat
 import torch
+
+from einops import rearrange, repeat
+from torch import Tensor, nn
 from torch.utils.data import IterableDataset
-from torch import nn, Tensor
 
 
 class AbstractDataset(abc.ABC):
@@ -272,7 +275,6 @@ def evaluate(model, val_loader, device, num_eval_batches):
     count = 0
     # Loop over each batch from the validation set
     for batch in val_loader:
-
         # Copy data to device if needed
         batch = tuple(t.to(device) for t in batch)
 
@@ -316,15 +318,25 @@ def run(out_dir, dataset, seed_offset):
     ).to(device)
 
     # Define parameter groups with different learning rates
-    embedding_params = list(model.token_embeddings.parameters()) + list(model.position_embeddings.parameters())
+    embedding_params = list(model.token_embeddings.parameters()) + list(
+        model.position_embeddings.parameters()
+    )
     lower_transformer_params = list(model.model[0].parameters())
-    higher_transformer_params = list(model.model[1].parameters()) + list(model.model[2].parameters()) + list(model.model[3].parameters())
+    higher_transformer_params = (
+        list(model.model[1].parameters())
+        + list(model.model[2].parameters())
+        + list(model.model[3].parameters())
+    )
 
-    optimizer = torch.optim.AdamW([
-        {'params': embedding_params, 'lr': 1e-4},
-        {'params': lower_transformer_params, 'lr': 1e-3},
-        {'params': higher_transformer_params, 'lr': 1e-2},
-    ], betas=(0.9, 0.98), weight_decay=0.5)
+    optimizer = torch.optim.AdamW(
+        [
+            {"params": embedding_params, "lr": 1e-4},
+            {"params": lower_transformer_params, "lr": 1e-3},
+            {"params": higher_transformer_params, "lr": 1e-2},
+        ],
+        betas=(0.9, 0.98),
+        weight_decay=0.5,
+    )
     num_train_batches = 10
     num_eval_batches = 8
     num_total_updates = 7500

@@ -6,6 +6,7 @@ import os.path as osp
 import pathlib
 import pickle
 import time
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -14,12 +15,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-import utils
+from . import utils
 
 
 @dataclass
 class State:
     """Probability distribution parameters for the next pen move."""
+
     mixture_logits: torch.Tensor
     mu_x: torch.Tensor
     mu_y: torch.Tensor
@@ -43,7 +45,12 @@ def sample_from_state(state, temperature, device):
     rho_xy = state.rho_xy.data[mixture_idx].cpu()
     # Sample x, y with mixture.
     x, y = utils.sample_bivariate_normal(
-        mu_x, mu_y, sigma_x, sigma_y, rho_xy, temperature,
+        mu_x,
+        mu_y,
+        sigma_x,
+        sigma_y,
+        rho_xy,
+        temperature,
     )
     # Sample pen state.
     pen_logits = state.pen_logits.data.cpu().numpy()
@@ -56,7 +63,10 @@ def sample_from_state(state, temperature, device):
     next_state[pen_state_idx + 2] = 1
     return (
         next_state.view(1, 1, -1).to(device),
-        x, y, pen_state_idx == 1, pen_state_idx == 2,
+        x,
+        y,
+        pen_state_idx == 1,
+        pen_state_idx == 2,
     )
 
 
@@ -68,8 +78,7 @@ def compute_reconstruction_loss(state, targets):
     pen_state = targets.data[:, :, 2:]
     mask = 1 - pen_state[:, :, -1]
     pdf_logits = utils.bivariate_normal_pdf(
-        dx, dy,
-        state.mu_x, state.mu_y, state.sigma_x, state.sigma_y, state.rho_xy
+        dx, dy, state.mu_x, state.mu_y, state.sigma_x, state.sigma_y, state.rho_xy
     )
     llh_xy = -torch.sum(
         mask * torch.logsumexp(state.mixture_logits + pdf_logits, dim=2)
@@ -80,9 +89,11 @@ def compute_reconstruction_loss(state, targets):
 
 def compute_kl_loss(sigma, mu, kl_min):
     """KL between distribution of latent signals and IID N(0, I)."""
-    kl_loss = -0.5 * (
-        torch.sum(1 + sigma - mu ** 2 - torch.exp(sigma))
-    ) / float(np.prod(sigma.size()))
+    kl_loss = (
+        -0.5
+        * (torch.sum(1 + sigma - mu**2 - torch.exp(sigma)))
+        / float(np.prod(sigma.size()))
+    )
     if kl_loss < kl_min:
         return kl_loss.detach()
     return kl_loss
@@ -97,7 +108,7 @@ class EncoderRNN(nn.Module):
         self.lstm = nn.LSTM(
             input_size=5,  # dx dy pen-down pen-up end.
             hidden_size=config.encoder_hidden_size,
-            bidirectional=True
+            bidirectional=True,
         )
         # Create mu and sigma from lstm's last output:
         self.fc_mu = nn.Linear(2 * self.hidden_size, config.latent_size)
@@ -120,7 +131,7 @@ class EncoderRNN(nn.Module):
         # mu and sigma:
         mu = self.fc_mu(hidden_forward_backward)
         sigma_hat = self.fc_sigma(hidden_forward_backward)
-        sigma = torch.exp(sigma_hat / 2.)
+        sigma = torch.exp(sigma_hat / 2.0)
         # noise ~ N(0, 1)
         noise = torch.normal(torch.zeros(mu.size()), torch.ones(mu.size()))
         latent_signal = mu + sigma * noise.to(self.device)
@@ -133,9 +144,7 @@ class DecoderRNN(nn.Module):
         super(DecoderRNN, self).__init__()
         self.hidden_size = config.decoder_hidden_size
         # FC layer used to initialize hidden and cell from a latent signal:
-        self.fc_hidden_cell = nn.Linear(
-            config.latent_size, 2 * self.hidden_size
-        )
+        self.fc_hidden_cell = nn.Linear(config.latent_size, 2 * self.hidden_size)
         # Unidirectional lstm:
         self.lstm = nn.LSTM(
             input_size=config.latent_size + 5,
@@ -143,8 +152,8 @@ class DecoderRNN(nn.Module):
         )
         # FC that predict Mixture's parameters from hiddens activations.
         # The number of parameters is:
-        # 5 * M (x and y means, x and y variances, xy covariances) 
-        # + M (mixture weights) 
+        # 5 * M (x and y means, x and y variances, xy covariances)
+        # + M (mixture weights)
         # + 3 (pen-down, pen-up, end).
         self.num_params = 6 * config.num_mixtures + 3
         self.fc_mixture = nn.Linear(self.hidden_size, self.num_params)
@@ -156,7 +165,8 @@ class DecoderRNN(nn.Module):
             hidden, cell = torch.split(hidden_cell, self.hidden_size, 1)
             # Remove unused first axis.
             hidden_cell_pair = (
-                hidden.unsqueeze(0).contiguous(), cell.unsqueeze(0).contiguous()
+                hidden.unsqueeze(0).contiguous(),
+                cell.unsqueeze(0).contiguous(),
             )
         outputs, (hidden, cell) = self.lstm(inputs, hidden_cell_pair)
         if self.training:
@@ -173,18 +183,22 @@ class DecoderRNN(nn.Module):
         mixture_logits, mu_x, mu_y, sigma_x, sigma_y, rho_xy = torch.split(
             params_mixture, 1, dim=2
         )
-        return State(
-            mixture_logits=F.log_softmax(mixture_logits.squeeze(), dim=-1),
-            mu_x=mu_x.squeeze(),
-            mu_y=mu_y.squeeze(),
-            sigma_x=torch.exp(sigma_x.squeeze()),
-            sigma_y=torch.exp(sigma_y.squeeze()),
-            rho_xy=torch.tanh(rho_xy.squeeze()),
-            pen_logits=F.log_softmax(pen_logits.squeeze(), dim=-1),
-        ), hidden, cell
+        return (
+            State(
+                mixture_logits=F.log_softmax(mixture_logits.squeeze(), dim=-1),
+                mu_x=mu_x.squeeze(),
+                mu_y=mu_y.squeeze(),
+                sigma_x=torch.exp(sigma_x.squeeze()),
+                sigma_y=torch.exp(sigma_y.squeeze()),
+                rho_xy=torch.tanh(rho_xy.squeeze()),
+                pen_logits=F.log_softmax(pen_logits.squeeze(), dim=-1),
+            ),
+            hidden,
+            cell,
+        )
 
 
-class Model():
+class Model:
     def __init__(self, config):
         self.device = config.device
         self.batch_size = config.batch_size
@@ -205,8 +219,8 @@ class Model():
         # Function to decay optimizers.
         def _decay(optimizer):
             for param_group in optimizer.param_groups:
-                if param_group['lr'] > config.min_learning_rate:
-                    param_group['lr'] *= config.learning_rate_decay_factor
+                if param_group["lr"] > config.min_learning_rate:
+                    param_group["lr"] *= config.learning_rate_decay_factor
 
         self.decay = _decay
         # kl loss parameters
@@ -216,11 +230,15 @@ class Model():
         self.kl_min = config.kl_min
         # eos and sos tokens:
         self.eos = (
-            torch.stack([torch.Tensor([0, 0, 0, 0, 1])] * config.batch_size)
-        ).unsqueeze(0).to(self.device)
+            (torch.stack([torch.Tensor([0, 0, 0, 0, 1])] * config.batch_size))
+            .unsqueeze(0)
+            .to(self.device)
+        )
         self.sos = (
-            torch.stack([torch.Tensor([0, 0, 1, 0, 0])] * config.batch_size)
-        ).unsqueeze(0).to(self.device)
+            (torch.stack([torch.Tensor([0, 0, 1, 0, 0])] * config.batch_size))
+            .unsqueeze(0)
+            .to(self.device)
+        )
 
     def train(self, sequences):
         self.encoder.train()
@@ -274,17 +292,19 @@ class Model():
             # Condition generation with encoded context.
             latent_signal, _, _ = self.encoder(context, 1)
         else:
-            latent_signal = torch.normal(
-                torch.zeros(self.latent_size), torch.ones(self.latent_size)
-            ).to(self.device).view(1, -1)
+            latent_signal = (
+                torch.normal(
+                    torch.zeros(self.latent_size), torch.ones(self.latent_size)
+                )
+                .to(self.device)
+                .view(1, -1)
+            )
         sos = torch.Tensor([0, 0, 1, 0, 0]).view(1, 1, -1).to(self.device)
         input = sos
         seq_x, seq_y, seq_z = [], [], []
         hidden_cell = None
         for _ in range(self.sequence_length):
-            decoder_input = torch.cat(
-                [input, latent_signal.unsqueeze(0)], dim=2
-            )
+            decoder_input = torch.cat([input, latent_signal.unsqueeze(0)], dim=2)
             # Decode:
             state, hidden, cell = self.decoder(
                 decoder_input, latent_signal, hidden_cell
@@ -308,7 +328,6 @@ class Model():
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--sequence_length", type=int, default=100)
@@ -318,10 +337,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_mixtures", type=int, default=20)
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument(
-        "--learning_rate_decay_factor", type=float, default=0.9999
-    )
-    parser.add_argument("--grad_clip", type=float, default=1.)
+    parser.add_argument("--learning_rate_decay_factor", type=float, default=0.9999)
+    parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument("--min_learning_rate", type=float, default=1e-5)
     parser.add_argument("--max_steps", type=int, default=5000)
     parser.add_argument("--initial_kl_weight", type=float, default=0.01)
@@ -337,12 +354,11 @@ if __name__ == "__main__":
     pathlib.Path(config.out_dir).mkdir(parents=True, exist_ok=True)
 
     for dataset_name in ["cat", "butterfly", "yoga", "owl"]:
-
         # Prepare model
-        if config.device == 'cuda':
-            assert torch.cuda.is_available(), (
-                "Device set to cuda, but cuda is unavailable."
-            )
+        if config.device == "cuda":
+            assert (
+                torch.cuda.is_available()
+            ), "Device set to cuda, but cuda is unavailable."
         model = Model(config)
         print("compiling the model... (takes a ~minute)")
         model.encoder = torch.compile(model.encoder)
@@ -351,9 +367,7 @@ if __name__ == "__main__":
         # Prepare data
         dataset = utils.get_dataset(dataset_name, config.sequence_length)
         get_batch = utils.get_batch_factory(
-            dataset,
-            config.sequence_length,
-            config.device
+            dataset, config.sequence_length, config.device
         )
 
         # training loop
@@ -372,10 +386,10 @@ if __name__ == "__main__":
             train_step_times.append(train_step_time)
             if step % 100 == 0:
                 print(
-                    f'step {step}, loss {loss:.4f}',
-                    f', recons. loss {reconstruction_loss:.4f}',
-                    f', kl_loss {kl_loss:.4f}',
-                    f', train_step_time {train_step_time:.4f}',
+                    f"step {step}, loss {loss:.4f}",
+                    f", recons. loss {reconstruction_loss:.4f}",
+                    f", kl_loss {kl_loss:.4f}",
+                    f", train_step_time {train_step_time:.4f}",
                 )
 
         final_infos[dataset_name] = {

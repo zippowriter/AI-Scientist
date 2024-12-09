@@ -4,19 +4,26 @@ import torch
 
 ####################### probabilities utils
 
+
 def bivariate_normal_pdf(dx, dy, mu_x, mu_y, sigma_x, sigma_y, rho_xy):
     """Probability density function of a (dx, dy) pair."""
     z_x = ((dx - mu_x) / sigma_x) ** 2
     z_y = ((dy - mu_y) / sigma_y) ** 2
     z_xy = (dx - mu_x) * (dy - mu_y) / (sigma_x * sigma_y)
     z = z_x + z_y - 2 * rho_xy * z_xy
-    logits = -z / (2 * (1 - rho_xy ** 2))
-    norm = (2 * np.pi * sigma_x * sigma_y) * torch.sqrt(1 - rho_xy ** 2)
+    logits = -z / (2 * (1 - rho_xy**2))
+    norm = (2 * np.pi * sigma_x * sigma_y) * torch.sqrt(1 - rho_xy**2)
     return logits - torch.log(norm)
 
 
 def sample_bivariate_normal(
-        mu_x, mu_y, sigma_x, sigma_y, rho_xy, temperature, greedy=False,
+    mu_x,
+    mu_y,
+    sigma_x,
+    sigma_y,
+    rho_xy,
+    temperature,
+    greedy=False,
 ):
     """Samples from bivariate normal distribution."""
     if greedy:
@@ -26,7 +33,7 @@ def sample_bivariate_normal(
     sigma_y *= np.sqrt(temperature)
     cov = [
         [sigma_x * sigma_x, rho_xy * sigma_x * sigma_y],
-        [rho_xy * sigma_x * sigma_y, sigma_y * sigma_y]
+        [rho_xy * sigma_x * sigma_y, sigma_y * sigma_y],
     ]
     x = np.random.multivariate_normal(mean, cov, 1)
     return x[0][0], x[0][1]
@@ -77,8 +84,8 @@ def normalize(strokes):
 
 
 def get_dataset(dataset_name, sequence_length):
-    file_name = 'datasets/' + dataset_name + '.npz'
-    dataset = np.load(file_name, encoding='latin1', allow_pickle=True)['train']
+    file_name = "datasets/" + dataset_name + ".npz"
+    dataset = np.load(file_name, encoding="latin1", allow_pickle=True)["train"]
     dataset = purify(dataset, sequence_length)
     dataset = normalize(dataset)
     return dataset
@@ -97,9 +104,9 @@ def get_batch_factory(dataset, sequence_length, device):
             len_seq = len(seq[:, 0])
             new_seq = np.zeros((sequence_length, 5))
             new_seq[:len_seq, :2] = seq[:, :2]
-            new_seq[:len_seq - 1, 2] = 1 - seq[:-1, 2]
+            new_seq[: len_seq - 1, 2] = 1 - seq[:-1, 2]
             new_seq[:len_seq, 3] = seq[:, 2]
-            new_seq[len_seq - 1:, 4] = 1
+            new_seq[len_seq - 1 :, 4] = 1
             new_seq[len_seq - 1, 2:4] = 0
             strokes.append(new_seq)
             indice += 1

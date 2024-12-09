@@ -2,12 +2,19 @@ import json
 import os
 import os.path as osp
 import time
-from typing import List, Dict, Union
+
+from typing import Dict, List, Union
 
 import backoff
 import requests
 
-from ai_scientist.llm import get_response_from_llm, extract_json_between_markers, create_client, AVAILABLE_LLMS
+from ai_scientist.llm import (
+    AVAILABLE_LLMS,
+    create_client,
+    extract_json_between_markers,
+    get_response_from_llm,
+)
+
 
 S2_API_KEY = os.getenv("S2_API_KEY")
 
@@ -74,12 +81,12 @@ ONLY INCLUDE "I am done" IF YOU ARE MAKING NO MORE CHANGES."""
 
 # GENERATE IDEAS
 def generate_ideas(
-        base_dir,
-        client,
-        model,
-        skip_generation=False,
-        max_num_generations=20,
-        num_reflections=5,
+    base_dir,
+    client,
+    model,
+    skip_generation=False,
+    max_num_generations=20,
+    num_reflections=5,
 ):
     if skip_generation:
         # Load existing ideas from file
@@ -150,7 +157,7 @@ def generate_ideas(
                     ## PARSE OUTPUT
                     json_output = extract_json_between_markers(text)
                     assert (
-                            json_output is not None
+                        json_output is not None
                     ), "Failed to extract JSON from LLM output"
                     print(json_output)
 
@@ -176,12 +183,12 @@ def generate_ideas(
 
 # GENERATE IDEAS OPEN-ENDED
 def generate_next_idea(
-        base_dir,
-        client,
-        model,
-        prev_idea_archive=[],
-        num_reflections=5,
-        max_attempts=10,
+    base_dir,
+    client,
+    model,
+    prev_idea_archive=[],
+    num_reflections=5,
+    max_attempts=10,
 ):
     idea_archive = prev_idea_archive
     original_archive_size = len(idea_archive)
@@ -249,7 +256,7 @@ Scores of 0 indicate the idea failed either during experimentation, writeup or r
                         ## PARSE OUTPUT
                         json_output = extract_json_between_markers(text)
                         assert (
-                                json_output is not None
+                            json_output is not None
                         ), "Failed to extract JSON from LLM output"
                         print(json_output)
 
@@ -359,11 +366,11 @@ This JSON will be automatically parsed, so ensure the format is precise.'''
 
 
 def check_idea_novelty(
-        ideas,
-        base_dir,
-        client,
-        model,
-        max_num_iterations=10,
+    ideas,
+    base_dir,
+    client,
+    model,
+    max_num_iterations=10,
 ):
     with open(osp.join(base_dir, "experiment.py"), "r") as f:
         code = f.read()

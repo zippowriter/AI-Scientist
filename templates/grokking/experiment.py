@@ -30,7 +30,7 @@ class AbstractDataset(abc.ABC):
         random.shuffle(idxs)
         self.train_pairs, self.val_pairs = (
             idxs[: int(len(idxs) * frac_train)],
-            idxs[int(len(idxs) * frac_train):],
+            idxs[int(len(idxs) * frac_train) :],
         )
 
     @abc.abstractmethod
@@ -184,13 +184,13 @@ class DecoderBlock(torch.nn.Module):
 
 class Transformer(torch.nn.Module):
     def __init__(
-            self,
-            num_layers: int,
-            dim_model: int,
-            num_heads: int,
-            vocab_size: int,
-            output_size: int,
-            seq_len: int,
+        self,
+        num_layers: int,
+        dim_model: int,
+        num_heads: int,
+        vocab_size: int,
+        output_size: int,
+        seq_len: int,
     ):
         super().__init__()
 
@@ -275,7 +275,6 @@ def evaluate(model, val_loader, device, num_eval_batches):
     count = 0
     # Loop over each batch from the validation set
     for batch in val_loader:
-
         # Copy data to device if needed
         batch = tuple(t.to(device) for t in batch)
 
@@ -367,7 +366,7 @@ def run(out_dir, dataset, seed_offset):
     }
     print(final_info)
     with open(
-            os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w"
+        os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w"
     ) as f:
         json.dump(final_info, f)
     return final_info, train_log_info, val_log_info

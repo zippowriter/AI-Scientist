@@ -1,23 +1,27 @@
 import argparse
 import json
 import multiprocessing
-import openai
 import os
 import os.path as osp
 import shutil
 import sys
 import time
+
+from datetime import datetime
+
+import openai
 import torch
+
 from aider.coders import Coder
 from aider.io import InputOutput
 from aider.models import Model
-from datetime import datetime
 
-from ai_scientist.generate_ideas import generate_next_idea, check_idea_novelty
-from ai_scientist.llm import create_client, AVAILABLE_LLMS
+from ai_scientist.generate_ideas import check_idea_novelty, generate_next_idea
+from ai_scientist.llm import AVAILABLE_LLMS, create_client
 from ai_scientist.perform_experiments import perform_experiments
-from ai_scientist.perform_review import perform_review, load_paper, perform_improvement
-from ai_scientist.perform_writeup import perform_writeup, generate_latex
+from ai_scientist.perform_review import load_paper, perform_improvement, perform_review
+from ai_scientist.perform_writeup import generate_latex, perform_writeup
+
 
 NUM_REFLECTIONS = 3
 
@@ -82,17 +86,17 @@ def get_available_gpus(gpu_ids=None):
 
 
 def worker(
-        queue,
-        base_dir,
-        results_dir,
-        model,
-        client,
-        client_model,
-        writeup,
-        improvement,
-        gpu_id,
-        idea_archive,
-        lock,
+    queue,
+    base_dir,
+    results_dir,
+    model,
+    client,
+    client_model,
+    writeup,
+    improvement,
+    gpu_id,
+    idea_archive,
+    lock,
 ):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
     print(f"Worker {gpu_id} started.")
@@ -136,15 +140,15 @@ def worker(
 
 
 def do_idea(
-        base_dir,
-        results_dir,
-        idea,
-        model,
-        client,
-        client_model,
-        writeup,
-        improvement,
-        log_file=False,
+    base_dir,
+    results_dir,
+    idea,
+    model,
+    client,
+    client_model,
+    writeup,
+    improvement,
+    log_file=False,
 ):
     ## CREATE PROJECT FOLDER
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -162,9 +166,9 @@ def do_idea(
     with open(notes, "w") as f:
         f.write(f"# Title: {idea['Title']}\n")
         f.write(f"# Experiment description: {idea['Experiment']}\n")
-        f.write(f"## Run 0: Baseline\n")
+        f.write("## Run 0: Baseline\n")
         f.write(f"Results: {baseline_results}\n")
-        f.write(f"Description: Baseline results.\n")
+        f.write("Description: Baseline results.\n")
     if log_file:
         original_stdout = sys.stdout
         original_stderr = sys.stderr
@@ -196,7 +200,7 @@ def do_idea(
         )
 
         print_time()
-        print(f"*Starting Experiments*")
+        print("*Starting Experiments*")
         try:
             success = perform_experiments(idea, folder_name, coder, baseline_results)
         except Exception as e:
@@ -209,7 +213,7 @@ def do_idea(
             return False, 0, idea
 
         print_time()
-        print(f"*Starting Writeup*")
+        print("*Starting Writeup*")
         ## PERFORM WRITEUP
         if writeup == "latex":
             writeup_file = osp.join(folder_name, "latex", "template.tex")
@@ -238,7 +242,7 @@ def do_idea(
             raise ValueError(f"Writeup format {writeup} not supported.")
 
         print_time()
-        print(f"*Starting Review*")
+        print("*Starting Review*")
         ## REVIEW PAPER
         if writeup == "latex":
             try:
@@ -263,7 +267,7 @@ def do_idea(
         ## IMPROVE WRITEUP
         if writeup == "latex" and improvement:
             print_time()
-            print(f"*Starting Improvement*")
+            print("*Starting Improvement*")
             try:
                 perform_improvement(review, coder)
                 generate_latex(

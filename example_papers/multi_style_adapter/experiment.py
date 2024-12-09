@@ -1,22 +1,26 @@
-import os
-import time
-import math
-import pickle
+import argparse
 import inspect
 import json
+import math
+import os
+import pickle
+import time
+
 from contextlib import nullcontext
 from dataclasses import dataclass
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
-import argparse
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import SVC
-import matplotlib.pyplot as plt
-from sklearn.manifold import TSNE
 import torch.cuda
+import torch.nn as nn
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.manifold import TSNE
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from torch.nn import functional as F
+
 
 # --- BEGIN model.py ---
 class LayerNorm(nn.Module):
@@ -32,7 +36,6 @@ class LayerNorm(nn.Module):
 
 
 class CausalSelfAttention(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
@@ -105,7 +108,6 @@ class CausalSelfAttention(nn.Module):
 
 
 class MLP(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
@@ -129,8 +131,8 @@ class StyleAdapter(nn.Module):
     def forward(self, x, style_emb):
         return x * self.linear(style_emb).unsqueeze(1)
 
-class Block(nn.Module):
 
+class Block(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
@@ -147,22 +149,17 @@ class Block(nn.Module):
 @dataclass
 class GPTConfig:
     block_size: int = 1024
-    vocab_size: int = (
-        50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    )
+    vocab_size: int = 50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
     dropout: float = 0.0
-    bias: bool = (
-        True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    )
+    bias: bool = True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     n_styles: int = 4  # number of styles for Multi-Style Adapter
     style_embd_dim: int = 64  # dimension of style embeddings
 
 
 class GPT(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         assert config.vocab_size is not None
@@ -188,14 +185,18 @@ class GPT(nn.Module):
         )  # https://paperswithcode.com/method/weight-tying
 
         # Multi-Style Adapter components
-        self.style_embeddings = nn.Parameter(torch.randn(config.n_styles, config.style_embd_dim))
+        self.style_embeddings = nn.Parameter(
+            torch.randn(config.n_styles, config.style_embd_dim)
+        )
         self.style_proj = nn.Linear(config.style_embd_dim, config.n_embd)
         self.style_classifier = nn.Sequential(
             nn.Linear(config.n_embd, config.n_embd),
             nn.ReLU(),
-            nn.Linear(config.n_embd, config.n_styles)
+            nn.Linear(config.n_embd, config.n_styles),
         )
-        self.style_adapters = nn.ModuleList([StyleAdapter(config) for _ in range(config.n_layer)])
+        self.style_adapters = nn.ModuleList(
+            [StyleAdapter(config) for _ in range(config.n_layer)]
+        )
 
         # init all weights
         self.apply(self._init_weights)
@@ -245,9 +246,13 @@ class GPT(nn.Module):
         style_logits = None
         for i, block in enumerate(self.transformer.h):
             x = block(x)
-            style_logits = self.style_classifier(x[:, -1, :])  # Use last token for classification
+            style_logits = self.style_classifier(
+                x[:, -1, :]
+            )  # Use last token for classification
             style_probs = F.softmax(style_logits, dim=-1)
-            style_emb = (style_probs @ self.style_embeddings)  # Weighted sum of style embeddings
+            style_emb = (
+                style_probs @ self.style_embeddings
+            )  # Weighted sum of style embeddings
             style_emb = self.style_proj(style_emb)
             x = self.style_adapters[i](x, style_emb)
 
@@ -358,10 +363,8 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     log_interval = 10 if dataset == "shakespeare_char" else 100
     eval_iters = 200
     eval_only = False  # if True, script exits right after the first eval
-    always_save_checkpoint = (
-        False  # we expect to overfit on this small dataset, so only save when val improves
-    )
-    never_save_checkpoint = True # never save checkpoints
+    always_save_checkpoint = False  # we expect to overfit on this small dataset, so only save when val improves
+    never_save_checkpoint = True  # never save checkpoints
     # model
     n_layer = 6  # baby GPT model :)
     n_head = 6
@@ -371,9 +374,7 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     n_styles = 4  # number of styles for Multi-Style Adapter
     style_embd_dim = 64  # dimension of style embeddings
     # adamw optimizer
-    learning_rate = (
-        1e-3  if dataset == "shakespeare_char" else 5e-4
-    )
+    learning_rate = 1e-3 if dataset == "shakespeare_char" else 5e-4
     max_iters = 5000 if dataset == "shakespeare_char" else 100000
     weight_decay = 1e-1
     beta1 = 0.9
@@ -382,15 +383,18 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     # learning rate decay settings
     decay_lr = True  # whether to decay the learning rate
     warmup_iters = 100 if dataset == "shakespeare_char" else 200
-    lr_decay_iters = max_iters # make equal to max_iters usually
+    lr_decay_iters = max_iters  # make equal to max_iters usually
     min_lr = 1e-4 if dataset == "shakespeare_char" else 5e-5
     # DDP settings
     backend = "nccl"  # 'nccl', 'gloo', etc.
     # system
     device = "cuda"  # Always use CUDA
-    dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
+    dtype = (
+        "bfloat16"
+        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        else "float16"
+    )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
     compile = True  # do not torch compile the model on macbooks
-
 
     # various inits, derived attributes, I/O setup
     # if not ddp, we are running on a single gpu, and one process
@@ -403,7 +407,9 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
-    device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
+    device_type = (
+        "cuda" if "cuda" in device else "cpu"
+    )  # for later use in torch.autocast
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {
         "float32": torch.float32,
@@ -419,14 +425,17 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     # poor man's data loader
     data_dir = os.path.join("../../../data", dataset)
 
-
     def get_batch(split):
         # We recreate np.memmap every batch to avoid a memory leak, as per
         # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
         if split == "train":
-            data = np.memmap(os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r")
+            data = np.memmap(
+                os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r"
+            )
         else:
-            data = np.memmap(os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r")
+            data = np.memmap(
+                os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r"
+            )
         ix = torch.randint(len(data) - block_size, (batch_size,))
         x = torch.stack(
             [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
@@ -439,8 +448,9 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         )
         if device_type == "cuda":
             # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(
-                device, non_blocking=True
+            x, y = (
+                x.pin_memory().to(device, non_blocking=True),
+                y.pin_memory().to(device, non_blocking=True),
             )
         else:
             x, y = x.to(device), y.to(device)
@@ -503,7 +513,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         unoptimized_model = model
         model = torch.compile(model)  # requires PyTorch 2.0
 
-
     # helps estimate an arbitrarily accurate loss over either split using many batches
     @torch.no_grad()
     def estimate_loss():
@@ -520,7 +529,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         model.train()
         return out
 
-
     # learning rate decay scheduler (cosine with warmup)
     def get_lr(it):
         # 1) linear warmup for warmup_iters steps
@@ -535,7 +543,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
         return min_lr + coeff * (learning_rate - min_lr)
 
-
     # logging
     val_log_info = []
     train_log_info = []
@@ -547,7 +554,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model
     while True:
-
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if decay_lr else learning_rate
         for param_group in optimizer.param_groups:
@@ -588,10 +594,15 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
             with ctx:
                 logits, loss, style_logits = model(X, Y)
                 # Add style classification loss (assuming uniform distribution of styles)
-                style_loss = F.cross_entropy(style_logits, torch.randint(0, n_styles, (X.size(0),), device=device))
+                style_loss = F.cross_entropy(
+                    style_logits,
+                    torch.randint(0, n_styles, (X.size(0),), device=device),
+                )
                 style_loss_weight = 0.1  # Adjust this weight to balance style adaptation and language modeling
                 total_loss = loss + style_loss_weight * style_loss
-                total_loss = total_loss / gradient_accumulation_steps  # scale the loss to account for gradient accumulation
+                total_loss = (
+                    total_loss / gradient_accumulation_steps
+                )  # scale the loss to account for gradient accumulation
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
             X, Y = get_batch("train")
             # backward pass, with gradient scaling if training in fp16
@@ -614,14 +625,12 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
             lossf = total_loss.item() * gradient_accumulation_steps
-            print(
-                f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms"
-            )
+            print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms")
             train_log_info.append(
                 {
                     "iter": iter_num,
                     "loss": lossf,
-                    "time": dt*1000,
+                    "time": dt * 1000,
                 }
             )
         iter_num += 1
@@ -644,27 +653,31 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     # === SAMPLING SCRIPT ===
 
     # New parameters for generation
-    start = " " 
+    start = " "
     num_samples = 10  # number of samples to draw
     max_new_tokens = 500  # number of tokens generated in each sample
-    temperature = 0.8  # 1.0 = no change, < 1.0 = less random, > 1.0 = more random, in predictions
+    temperature = (
+        0.8  # 1.0 = no change, < 1.0 = less random, > 1.0 = more random, in predictions
+    )
     top_k = 200  # retain only the top_k most likely tokens, clamp others to have 0 probability
 
     # Encoding setup
-    assert os.path.exists(meta_path), "meta.pkl not found, please run training script first"
+    assert os.path.exists(
+        meta_path
+    ), "meta.pkl not found, please run training script first"
     print(f"Loading meta from {meta_path}...")
-    with open(meta_path, 'rb') as f:
+    with open(meta_path, "rb") as f:
         meta = pickle.load(f)
-    stoi, itos = meta['stoi'], meta['itos']
+    stoi, itos = meta["stoi"], meta["itos"]
     encode = lambda s: [stoi[c] for c in s]
-    decode = lambda l: ''.join([itos[i] for i in l])
+    decode = lambda l: "".join([itos[i] for i in l])
 
     # Encode the beginning of the prompt
-    if start.startswith('FILE:'):
-        with open(start[5:], 'r', encoding='utf-8') as f:
+    if start.startswith("FILE:"):
+        with open(start[5:], "r", encoding="utf-8") as f:
             start = f.read()
     start_ids = encode(start)
-    x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
+    x = torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...]
 
     # Run generation
     model.eval()
@@ -673,28 +686,32 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         with ctx:
             for k in range(num_samples):
                 start_time = time.time()
-                y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                y = model.generate(
+                    x, max_new_tokens, temperature=temperature, top_k=top_k
+                )
                 end_time = time.time()
-                
+
                 generated_text = decode(y[0].tolist())
                 inference_time = end_time - start_time
                 tokens_per_second = max_new_tokens / inference_time
-                
+
                 print(f"Sample {k+1}:")
                 print(generated_text)
                 print(f"Inference time: {inference_time:.2f} seconds")
                 print(f"Tokens per second: {tokens_per_second:.2f}")
-                print('---------------')
-                
-                results.append({
-                    "sample_id": k+1,
-                    "generated_text": generated_text,
-                    "inference_time": inference_time,
-                    "tokens_per_second": tokens_per_second
-                })
+                print("---------------")
+
+                results.append(
+                    {
+                        "sample_id": k + 1,
+                        "generated_text": generated_text,
+                        "inference_time": inference_time,
+                        "tokens_per_second": tokens_per_second,
+                    }
+                )
 
     # Calculate and print average inference speed
-    avg_tokens_per_second = sum(r['tokens_per_second'] for r in results) / len(results)
+    avg_tokens_per_second = sum(r["tokens_per_second"] for r in results) / len(results)
     print(f"Average tokens per second: {avg_tokens_per_second:.2f}")
 
     final_info["avg_inference_tokens_per_second"] = avg_tokens_per_second
@@ -703,51 +720,60 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     style_consistency_scores = analyze_style_consistency(results)
     final_info["style_consistency_scores"] = style_consistency_scores
 
-    with open(os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w") as f:
+    with open(
+        os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w"
+    ) as f:
         json.dump(final_info, f)
     return final_info, train_log_info, val_log_info
 
+
 def train_style_classifier(texts, labels):
-    X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        texts, labels, test_size=0.2, random_state=42
+    )
     vectorizer = TfidfVectorizer(max_features=5000)
     X_train_vec = vectorizer.fit_transform(X_train)
     X_test_vec = vectorizer.transform(X_test)
-    
-    classifier = SVC(kernel='linear', C=1.0, random_state=42)
+
+    classifier = SVC(kernel="linear", C=1.0, random_state=42)
     classifier.fit(X_train_vec, y_train)
-    
+
     return vectorizer, classifier
+
 
 def analyze_style_consistency(results):
     # Assume we have a pre-defined set of style labels
     style_labels = ["formal", "informal", "poetic", "technical"]
-    
+
     # Generate synthetic data for training the style classifier
     synthetic_texts = []
     synthetic_labels = []
     for style in style_labels:
         synthetic_texts.extend([f"This is a {style} text" for _ in range(100)])
         synthetic_labels.extend([style for _ in range(100)])
-    
+
     vectorizer, classifier = train_style_classifier(synthetic_texts, synthetic_labels)
-    
+
     style_consistency_scores = []
     for sample in results:
-        generated_text = sample['generated_text']
-        chunks = [generated_text[i:i+100] for i in range(0, len(generated_text), 100)]
+        generated_text = sample["generated_text"]
+        chunks = [
+            generated_text[i : i + 100] for i in range(0, len(generated_text), 100)
+        ]
         chunk_vectors = vectorizer.transform(chunks)
         chunk_predictions = classifier.predict(chunk_vectors)
-        
+
         # Calculate consistency as the proportion of chunks with the same style
         unique, counts = np.unique(chunk_predictions, return_counts=True)
         most_common_style = unique[np.argmax(counts)]
         consistency_score = np.max(counts) / len(chunk_predictions)
         style_consistency_scores.append(consistency_score)
-    
+
     return {
         "mean_consistency": np.mean(style_consistency_scores),
-        "std_consistency": np.std(style_consistency_scores)
+        "std_consistency": np.std(style_consistency_scores),
     }
+
 
 def visualize_style_embeddings(model, out_dir):
     style_embeddings = model.style_embeddings.detach().cpu().numpy()
@@ -755,40 +781,54 @@ def visualize_style_embeddings(model, out_dir):
     style_embeddings_2d = tsne.fit_transform(style_embeddings)
 
     plt.figure(figsize=(10, 8))
-    scatter = plt.scatter(style_embeddings_2d[:, 0], style_embeddings_2d[:, 1], c=range(len(style_embeddings_2d)), cmap='viridis')
-    plt.colorbar(scatter, label='Style Index')
-    plt.title('t-SNE Visualization of Style Embeddings')
-    plt.xlabel('t-SNE Dimension 1')
-    plt.ylabel('t-SNE Dimension 2')
-    plt.savefig(os.path.join(out_dir, 'style_embeddings_visualization.png'))
+    scatter = plt.scatter(
+        style_embeddings_2d[:, 0],
+        style_embeddings_2d[:, 1],
+        c=range(len(style_embeddings_2d)),
+        cmap="viridis",
+    )
+    plt.colorbar(scatter, label="Style Index")
+    plt.title("t-SNE Visualization of Style Embeddings")
+    plt.xlabel("t-SNE Dimension 1")
+    plt.ylabel("t-SNE Dimension 2")
+    plt.savefig(os.path.join(out_dir, "style_embeddings_visualization.png"))
     plt.close()
+
 
 def visualize_attention_patterns(model, out_dir):
     model.eval()
     # Generate a random input tensor
-    x = torch.randint(0, model.config.vocab_size, (1, model.config.block_size), device=next(model.parameters()).device)
+    x = torch.randint(
+        0,
+        model.config.vocab_size,
+        (1, model.config.block_size),
+        device=next(model.parameters()).device,
+    )
     with torch.no_grad():
         _, _, style_logits = model(x)
-    
+
     style_probs = F.softmax(style_logits, dim=-1)
     dominant_style = torch.argmax(style_probs, dim=-1)
 
     for layer in range(model.config.n_layer):
-        attn_weights = model.transformer.h[layer].attn.attn_dropout.weight.detach().cpu().numpy()
-        
+        attn_weights = (
+            model.transformer.h[layer].attn.attn_dropout.weight.detach().cpu().numpy()
+        )
+
         plt.figure(figsize=(12, 8))
-        plt.imshow(attn_weights, cmap='viridis', aspect='auto')
-        plt.title(f'Attention Weights for Layer {layer+1}')
-        plt.xlabel('Key')
-        plt.ylabel('Query')
-        plt.colorbar(label='Attention Weight')
-        plt.savefig(os.path.join(out_dir, f'attention_pattern_layer_{layer+1}.png'))
+        plt.imshow(attn_weights, cmap="viridis", aspect="auto")
+        plt.title(f"Attention Weights for Layer {layer+1}")
+        plt.xlabel("Key")
+        plt.ylabel("Query")
+        plt.colorbar(label="Attention Weight")
+        plt.savefig(os.path.join(out_dir, f"attention_pattern_layer_{layer+1}.png"))
         plt.close()
 
     print(f"Dominant style for the batch: {dominant_style.item()}")
 
-parser = argparse.ArgumentParser(description='Run experiment')
-parser.add_argument('--out_dir', type=str, default='run_0', help='Output directory')
+
+parser = argparse.ArgumentParser(description="Run experiment")
+parser.add_argument("--out_dir", type=str, default="run_0", help="Output directory")
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -809,13 +849,20 @@ if __name__ == "__main__":
             all_results[f"{dataset}_{seed_offset}_train_info"] = train_info
             all_results[f"{dataset}_{seed_offset}_val_info"] = val_info
             final_info_list.append(final_info)
-        final_info_dict = {k: [d[k] for d in final_info_list] for k in final_info_list[0].keys()}
+        final_info_dict = {
+            k: [d[k] for d in final_info_list] for k in final_info_list[0].keys()
+        }
         means = {}
         stderrs = {}
         for k, v in final_info_dict.items():
             if isinstance(v[0], dict):  # If the value is a nested dictionary
-                means[k] = {inner_k: np.mean([d[inner_k] for d in v]) for inner_k in v[0].keys()}
-                stderrs[k] = {inner_k: np.std([d[inner_k] for d in v]) / len(v) for inner_k in v[0].keys()}
+                means[k] = {
+                    inner_k: np.mean([d[inner_k] for d in v]) for inner_k in v[0].keys()
+                }
+                stderrs[k] = {
+                    inner_k: np.std([d[inner_k] for d in v]) / len(v)
+                    for inner_k in v[0].keys()
+                }
             else:
                 means[f"{k}_mean"] = np.mean(v)
                 stderrs[f"{k}_stderr"] = np.std(v) / len(v)
@@ -842,4 +889,6 @@ if __name__ == "__main__":
         visualize_style_embeddings(model, out_dir)
         visualize_attention_patterns(model, out_dir)
     else:
-        print(f"Checkpoint file not found at {checkpoint_path}. Skipping visualizations.")
+        print(
+            f"Checkpoint file not found at {checkpoint_path}. Skipping visualizations."
+        )

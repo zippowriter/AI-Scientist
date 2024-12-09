@@ -1,9 +1,11 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["x_div_y", "x_minus_y", "x_plus_y", "permutation"]
@@ -75,7 +77,7 @@ labels = {
     "run_1": "Initial Layer-wise LR",
     "run_2": "Adjusted Layer-wise LR",
     "run_3": "Optimized Layer-wise LR",
-    "run_4": "Fine-tuned Layer-wise LR"
+    "run_4": "Fine-tuned Layer-wise LR",
 }
 
 

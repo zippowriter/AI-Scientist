@@ -1,17 +1,21 @@
-import os
-import time
-import math
-import pickle
+import argparse
 import inspect
 import json
+import math
+import os
+import pickle
+import time
+
+from contextlib import nullcontext
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import argparse
-from contextlib import nullcontext
-from dataclasses import dataclass
-from q_learning_agent import QLearningAgent
+
+from .q_learning_agent import QLearningAgent
+
 
 # --- BEGIN model.py ---
 class LayerNorm(nn.Module):
@@ -27,7 +31,6 @@ class LayerNorm(nn.Module):
 
 
 class CausalSelfAttention(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
@@ -100,7 +103,6 @@ class CausalSelfAttention(nn.Module):
 
 
 class MLP(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
@@ -117,7 +119,6 @@ class MLP(nn.Module):
 
 
 class Block(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
@@ -134,20 +135,15 @@ class Block(nn.Module):
 @dataclass
 class GPTConfig:
     block_size: int = 1024
-    vocab_size: int = (
-        50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    )
+    vocab_size: int = 50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
     dropout: float = 0.0
-    bias: bool = (
-        True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    )
+    bias: bool = True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
 
 
 class GPT(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         assert config.vocab_size is not None
@@ -325,10 +321,8 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     log_interval = 10 if dataset == "shakespeare_char" else 100
     eval_iters = 200
     eval_only = False  # if True, script exits right after the first eval
-    always_save_checkpoint = (
-        False  # we expect to overfit on this small dataset, so only save when val improves
-    )
-    never_save_checkpoint = True # never save checkpoints
+    always_save_checkpoint = False  # we expect to overfit on this small dataset, so only save when val improves
+    never_save_checkpoint = True  # never save checkpoints
     # model
     n_layer = 6  # baby GPT model :)
     n_head = 6
@@ -336,9 +330,7 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     dropout = 0.2  # for pretraining 0 is good, for finetuning try 0.1+
     bias = False  # do we use bias inside LayerNorm and Linear layers?
     # adamw optimizer
-    learning_rate = (
-        2e-3  if dataset == "shakespeare_char" else 1e-3
-    )
+    learning_rate = 2e-3 if dataset == "shakespeare_char" else 1e-3
     max_iters = 5000 if dataset == "shakespeare_char" else 100000
     weight_decay = 1e-1
     beta1 = 0.9
@@ -347,15 +339,18 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     # learning rate decay settings
     decay_lr = True  # whether to decay the learning rate
     warmup_iters = 100 if dataset == "shakespeare_char" else 200
-    lr_decay_iters = max_iters # make equal to max_iters usually
+    lr_decay_iters = max_iters  # make equal to max_iters usually
     min_lr = 1e-4 if dataset == "shakespeare_char" else 5e-5
     # DDP settings
     backend = "nccl"  # 'nccl', 'gloo', etc.
     # system
     device = "cuda"  # Always use CUDA
-    dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
+    dtype = (
+        "bfloat16"
+        if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+        else "float16"
+    )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
     compile = True  # do not torch compile the model on macbooks
-
 
     # various inits, derived attributes, I/O setup
     # if not ddp, we are running on a single gpu, and one process
@@ -368,7 +363,9 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
-    device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
+    device_type = (
+        "cuda" if "cuda" in device else "cpu"
+    )  # for later use in torch.autocast
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {
         "float32": torch.float32,
@@ -384,14 +381,17 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     # poor man's data loader
     data_dir = os.path.join("../../../data", dataset)
 
-
     def get_batch(split):
         # We recreate np.memmap every batch to avoid a memory leak, as per
         # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
         if split == "train":
-            data = np.memmap(os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r")
+            data = np.memmap(
+                os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r"
+            )
         else:
-            data = np.memmap(os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r")
+            data = np.memmap(
+                os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r"
+            )
         ix = torch.randint(len(data) - block_size, (batch_size,))
         x = torch.stack(
             [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
@@ -404,8 +404,9 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         )
         if device_type == "cuda":
             # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(
-                device, non_blocking=True
+            x, y = (
+                x.pin_memory().to(device, non_blocking=True),
+                y.pin_memory().to(device, non_blocking=True),
             )
         else:
             x, y = x.to(device), y.to(device)
@@ -467,7 +468,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         unoptimized_model = model
         model = torch.compile(model)  # requires PyTorch 2.0
 
-
     # helps estimate an arbitrarily accurate loss over either split using many batches
     @torch.no_grad()
     def estimate_loss():
@@ -484,7 +484,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         model.train()
         return out
 
-
     # learning rate decay scheduler (cosine with warmup)
     def get_lr(it):
         # 1) linear warmup for warmup_iters steps
@@ -499,7 +498,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
         return min_lr + coeff * (learning_rate - min_lr)
 
-
     # logging
     val_log_info = []
     train_log_info = []
@@ -511,7 +509,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model
     while True:
-
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if decay_lr else learning_rate
         for param_group in optimizer.param_groups:
@@ -584,14 +581,12 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
             lossf = loss.item() * gradient_accumulation_steps
-            print(
-                f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms"
-            )
+            print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms")
             train_log_info.append(
                 {
                     "iter": iter_num,
                     "loss": lossf,
-                    "time": dt*1000,
+                    "time": dt * 1000,
                 }
             )
         iter_num += 1
@@ -614,27 +609,31 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     # === SAMPLING SCRIPT ===
 
     # New parameters for generation
-    start = " " 
+    start = " "
     num_samples = 10  # number of samples to draw
     max_new_tokens = 500  # number of tokens generated in each sample
-    temperature = 0.8  # 1.0 = no change, < 1.0 = less random, > 1.0 = more random, in predictions
+    temperature = (
+        0.8  # 1.0 = no change, < 1.0 = less random, > 1.0 = more random, in predictions
+    )
     top_k = 200  # retain only the top_k most likely tokens, clamp others to have 0 probability
 
     # Encoding setup
-    assert os.path.exists(meta_path), "meta.pkl not found, please run training script first"
+    assert os.path.exists(
+        meta_path
+    ), "meta.pkl not found, please run training script first"
     print(f"Loading meta from {meta_path}...")
-    with open(meta_path, 'rb') as f:
+    with open(meta_path, "rb") as f:
         meta = pickle.load(f)
-    stoi, itos = meta['stoi'], meta['itos']
+    stoi, itos = meta["stoi"], meta["itos"]
     encode = lambda s: [stoi[c] for c in s]
-    decode = lambda l: ''.join([itos[i] for i in l])
+    decode = lambda l: "".join([itos[i] for i in l])
 
     # Encode the beginning of the prompt
-    if start.startswith('FILE:'):
-        with open(start[5:], 'r', encoding='utf-8') as f:
+    if start.startswith("FILE:"):
+        with open(start[5:], "r", encoding="utf-8") as f:
             start = f.read()
     start_ids = encode(start)
-    x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
+    x = torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...]
 
     # Run generation
     model.eval()
@@ -643,38 +642,45 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
         with ctx:
             for k in range(num_samples):
                 start_time = time.time()
-                y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                y = model.generate(
+                    x, max_new_tokens, temperature=temperature, top_k=top_k
+                )
                 end_time = time.time()
-                
+
                 generated_text = decode(y[0].tolist())
                 inference_time = end_time - start_time
                 tokens_per_second = max_new_tokens / inference_time
-                
+
                 print(f"Sample {k+1}:")
                 print(generated_text)
                 print(f"Inference time: {inference_time:.2f} seconds")
                 print(f"Tokens per second: {tokens_per_second:.2f}")
-                print('---------------')
-                
-                results.append({
-                    "sample_id": k+1,
-                    "generated_text": generated_text,
-                    "inference_time": inference_time,
-                    "tokens_per_second": tokens_per_second
-                })
+                print("---------------")
+
+                results.append(
+                    {
+                        "sample_id": k + 1,
+                        "generated_text": generated_text,
+                        "inference_time": inference_time,
+                        "tokens_per_second": tokens_per_second,
+                    }
+                )
 
     # Calculate and print average inference speed
-    avg_tokens_per_second = sum(r['tokens_per_second'] for r in results) / len(results)
+    avg_tokens_per_second = sum(r["tokens_per_second"] for r in results) / len(results)
     print(f"Average tokens per second: {avg_tokens_per_second:.2f}")
 
     final_info["avg_inference_tokens_per_second"] = avg_tokens_per_second
 
-    with open(os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w") as f:
+    with open(
+        os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w"
+    ) as f:
         json.dump(final_info, f)
     return final_info, train_log_info, val_log_info
 
-parser = argparse.ArgumentParser(description='Run experiment')
-parser.add_argument('--out_dir', type=str, default='run_0', help='Output directory')
+
+parser = argparse.ArgumentParser(description="Run experiment")
+parser.add_argument("--out_dir", type=str, default="run_0", help="Output directory")
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -695,9 +701,13 @@ if __name__ == "__main__":
             all_results[f"{dataset}_{seed_offset}_train_info"] = train_info
             all_results[f"{dataset}_{seed_offset}_val_info"] = val_info
             final_info_list.append(final_info)
-        final_info_dict = {k: [d[k] for d in final_info_list] for k in final_info_list[0].keys()}
+        final_info_dict = {
+            k: [d[k] for d in final_info_list] for k in final_info_list[0].keys()
+        }
         means = {f"{k}_mean": np.mean(v) for k, v in final_info_dict.items()}
-        stderrs = {f"{k}_stderr": np.std(v) / len(v) for k, v in final_info_dict.items()}
+        stderrs = {
+            f"{k}_stderr": np.std(v) / len(v) for k, v in final_info_dict.items()
+        }
         final_infos[dataset] = {
             "means": means,
             "stderrs": stderrs,

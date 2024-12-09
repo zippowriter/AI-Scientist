@@ -1,9 +1,11 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["x_div_y", "x_minus_y", "x_plus_y", "permutation"]
@@ -121,15 +123,20 @@ plt.figure(figsize=(12, 6))
 x = np.arange(len(datasets))
 width = 0.15
 for i, run in enumerate(runs):
-    plt.bar(x + i*width, [step_val_acc_99[dataset][i] for dataset in datasets], width, label=labels[run])
+    plt.bar(
+        x + i * width,
+        [step_val_acc_99[dataset][i] for dataset in datasets],
+        width,
+        label=labels[run],
+    )
 
-plt.xlabel('Datasets')
-plt.ylabel('Steps to 99% Validation Accuracy')
-plt.title('Steps to 99% Validation Accuracy Across Runs and Datasets')
+plt.xlabel("Datasets")
+plt.ylabel("Steps to 99% Validation Accuracy")
+plt.title("Steps to 99% Validation Accuracy Across Runs and Datasets")
 plt.xticks(x + width * 2.5, datasets)
-plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
 plt.tight_layout()
-plt.savefig('steps_to_99_acc.png')
+plt.savefig("steps_to_99_acc.png")
 plt.close()
 
 # Plot 3: Bar plot of final validation accuracy for each dataset and run
@@ -143,13 +150,18 @@ plt.figure(figsize=(12, 6))
 x = np.arange(len(datasets))
 width = 0.15
 for i, run in enumerate(runs):
-    plt.bar(x + i*width, [final_val_acc[dataset][i] for dataset in datasets], width, label=labels[run])
+    plt.bar(
+        x + i * width,
+        [final_val_acc[dataset][i] for dataset in datasets],
+        width,
+        label=labels[run],
+    )
 
-plt.xlabel('Datasets')
-plt.ylabel('Final Validation Accuracy')
-plt.title('Final Validation Accuracy Across Runs and Datasets')
+plt.xlabel("Datasets")
+plt.ylabel("Final Validation Accuracy")
+plt.title("Final Validation Accuracy Across Runs and Datasets")
 plt.xticks(x + width * 2.5, datasets)
-plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
 plt.tight_layout()
-plt.savefig('final_val_acc.png')
+plt.savefig("final_val_acc.png")
 plt.close()

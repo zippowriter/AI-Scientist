@@ -1,10 +1,13 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 from scipy.signal import savgol_filter
+
 
 # LOAD FINAL RESULTS:
 datasets = ["x_div_y", "x_minus_y", "x_plus_y", "permutation"]
@@ -70,7 +73,11 @@ for folder in folders:
                 run_info[dataset]["train_acc_sterr"] = stderr_train_accs
 
             # Add MDL info
-            mdl_data = [info for k, info in results_dict.items() if dataset in k and "mdl_info" in k]
+            mdl_data = [
+                info
+                for k, info in results_dict.items()
+                if dataset in k and "mdl_info" in k
+            ]
             if mdl_data:
                 run_info[dataset]["mdl_step"] = [item["step"] for item in mdl_data[0]]
                 run_info[dataset]["mdl"] = [item["mdl"] for item in mdl_data[0]]
@@ -191,7 +198,13 @@ for dataset in datasets:
             mdl_smooth = savgol_filter(mdl_normalized, window_length=5, polyorder=2)
 
             plt.plot(iters, val_acc, label=f"{labels[run]} - Val Acc", color=colors[i])
-            plt.plot(mdl_step, mdl_smooth, label=f"{labels[run]} - MDL", linestyle='--', color=colors[i])
+            plt.plot(
+                mdl_step,
+                mdl_smooth,
+                label=f"{labels[run]} - MDL",
+                linestyle="--",
+                color=colors[i],
+            )
 
     plt.title(f"Validation Accuracy and MDL for {dataset} Dataset")
     plt.xlabel("Update Steps")
@@ -219,15 +232,26 @@ for dataset in datasets:
             mdl_transition_point = mdl_step[mdl_transition_idx]
 
             # Find grokking point (95% validation accuracy)
-            grokking_point = next((step for step, acc in zip(results_info[run][dataset]["step"], val_acc) if acc >= 0.95), None)
+            grokking_point = next(
+                (
+                    step
+                    for step, acc in zip(results_info[run][dataset]["step"], val_acc)
+                    if acc >= 0.95
+                ),
+                None,
+            )
 
             # Calculate correlation between MDL reduction and validation accuracy improvement
             mdl_normalized = (mdl - np.min(mdl)) / (np.max(mdl) - np.min(mdl))
-            val_acc_interp = np.interp(mdl_step, results_info[run][dataset]["step"], val_acc)
+            val_acc_interp = np.interp(
+                mdl_step, results_info[run][dataset]["step"], val_acc
+            )
             correlation = np.corrcoef(mdl_normalized, val_acc_interp)[0, 1]
 
             # Calculate generalization gap
-            train_acc_interp = np.interp(mdl_step, results_info[run][dataset]["step"], train_acc)
+            train_acc_interp = np.interp(
+                mdl_step, results_info[run][dataset]["step"], train_acc
+            )
             gen_gap = train_acc_interp - val_acc_interp
 
             mdl_analysis[dataset][run] = {
@@ -237,7 +261,7 @@ for dataset in datasets:
                 "mdl": mdl,
                 "mdl_step": mdl_step,
                 "val_acc": val_acc_interp,
-                "gen_gap": gen_gap
+                "gen_gap": gen_gap,
             }
 
 # Plot MDL transition point vs Grokking point
@@ -249,7 +273,7 @@ for dataset in datasets:
             grok_p = mdl_analysis[dataset][run]["grokking_point"]
             plt.scatter(mdl_tp, grok_p, label=f"{dataset} - {run}")
 
-plt.plot([0, max(plt.xlim())], [0, max(plt.xlim())], 'k--', alpha=0.5)
+plt.plot([0, max(plt.xlim())], [0, max(plt.xlim())], "k--", alpha=0.5)
 plt.xlabel("MDL Transition Point")
 plt.ylabel("Grokking Point")
 plt.title("MDL Transition Point vs Grokking Point")
@@ -261,7 +285,9 @@ plt.close()
 # Plot correlation between MDL reduction and val acc improvement
 plt.figure(figsize=(10, 6))
 for dataset in datasets:
-    correlations = [mdl_analysis[dataset][run]["correlation"] for run in runs if run != "run_0"]
+    correlations = [
+        mdl_analysis[dataset][run]["correlation"] for run in runs if run != "run_0"
+    ]
     plt.bar(dataset, np.mean(correlations), yerr=np.std(correlations), capsize=5)
 
 plt.xlabel("Dataset")
@@ -279,19 +305,19 @@ for dataset in datasets:
             mdl_step = mdl_analysis[dataset][run]["mdl_step"]
             mdl = mdl_analysis[dataset][run]["mdl"]
             gen_gap = mdl_analysis[dataset][run]["gen_gap"]
-            
+
             plt.subplot(2, 1, 1)
             plt.plot(mdl_step, mdl, label=f"{run} - MDL")
             plt.title(f"MDL Evolution and Generalization Gap - {dataset}")
             plt.ylabel("MDL")
             plt.legend()
-            
+
             plt.subplot(2, 1, 2)
             plt.plot(mdl_step, gen_gap, label=f"{run} - Gen Gap")
             plt.xlabel("Steps")
             plt.ylabel("Generalization Gap")
             plt.legend()
-    
+
     plt.tight_layout()
     plt.savefig(f"mdl_gen_gap_{dataset}.png")
     plt.close()
@@ -323,7 +349,7 @@ for dataset in datasets:
             if mdl_tp is not None and grok_p is not None:
                 plt.scatter(mdl_tp, grok_p, label=f"{dataset} - {run}")
 if plt.gca().get_xlim()[1] > 0 and plt.gca().get_ylim()[1] > 0:
-    plt.plot([0, max(plt.xlim())], [0, max(plt.ylim())], 'k--', alpha=0.5)
+    plt.plot([0, max(plt.xlim())], [0, max(plt.ylim())], "k--", alpha=0.5)
 plt.xlabel("MDL Transition Point")
 plt.ylabel("Grokking Point")
 plt.title("MDL Transition Point vs Grokking Point")
@@ -358,13 +384,19 @@ for dataset in datasets:
     avg_grok_p = np.mean(grok_ps) if grok_ps else None
     avg_correlation = np.mean(correlations) if correlations else None
     print(f"Dataset: {dataset}")
-    print(f"  Average MDL Transition Point: {avg_mdl_tp:.2f if avg_mdl_tp is not None else 'N/A'}")
-    print(f"  Average Grokking Point: {avg_grok_p:.2f if avg_grok_p is not None else 'N/A'}")
+    print(
+        f"  Average MDL Transition Point: {avg_mdl_tp:.2f if avg_mdl_tp is not None else 'N/A'}"
+    )
+    print(
+        f"  Average Grokking Point: {avg_grok_p:.2f if avg_grok_p is not None else 'N/A'}"
+    )
     if avg_mdl_tp is not None and avg_grok_p is not None:
         print(f"  Difference: {abs(avg_mdl_tp - avg_grok_p):.2f}")
     else:
         print("  Difference: N/A")
-    print(f"  Average Correlation: {avg_correlation:.4f if avg_correlation is not None else 'N/A'}")
+    print(
+        f"  Average Correlation: {avg_correlation:.4f if avg_correlation is not None else 'N/A'}"
+    )
 
     # Add these lines for debugging
     print(f"  MDL Transition Points: {mdl_tps}")
@@ -379,20 +411,33 @@ try:
         for run in runs:
             if run != "run_0":
                 analysis = mdl_analysis[dataset][run]
-                mdl_transition_rate = np.min(np.gradient(analysis['mdl'], analysis['mdl_step']))
-                if analysis['grokking_point'] is not None and analysis['mdl_transition_point'] is not None:
-                    if analysis['grokking_point'] != analysis['mdl_transition_point']:
-                        grokking_speed = 1 / (analysis['grokking_point'] - analysis['mdl_transition_point'])
+                mdl_transition_rate = np.min(
+                    np.gradient(analysis["mdl"], analysis["mdl_step"])
+                )
+                if (
+                    analysis["grokking_point"] is not None
+                    and analysis["mdl_transition_point"] is not None
+                ):
+                    if analysis["grokking_point"] != analysis["mdl_transition_point"]:
+                        grokking_speed = 1 / (
+                            analysis["grokking_point"]
+                            - analysis["mdl_transition_point"]
+                        )
                     else:
                         grokking_speed = np.inf
-                    plt.scatter(mdl_transition_rate, grokking_speed, label=f"{dataset} - {labels[run]}", alpha=0.7)
+                    plt.scatter(
+                        mdl_transition_rate,
+                        grokking_speed,
+                        label=f"{dataset} - {labels[run]}",
+                        alpha=0.7,
+                    )
 
     plt.xlabel("MDL Transition Rate")
     plt.ylabel("Grokking Speed")
     plt.title("MDL Transition Rate vs Grokking Speed")
     plt.legend()
-    plt.xscale('symlog')
-    plt.yscale('symlog')
+    plt.xscale("symlog")
+    plt.yscale("symlog")
     plt.grid(True, which="both", ls="-", alpha=0.2)
     plt.tight_layout()
     plt.savefig("mdl_transition_rate_vs_grokking_speed.png")
@@ -406,15 +451,25 @@ for dataset in datasets:
     for run in runs:
         if run != "run_0":
             analysis = mdl_analysis[dataset][run]
-            mdl_step = analysis['mdl_step']
-            mdl = analysis['mdl']
-            val_acc = analysis['val_acc']
-            
-            plt.plot(mdl_step, mdl, label=f'{labels[run]} - MDL')
-            plt.plot(mdl_step, val_acc, label=f'{labels[run]} - Val Acc')
-            plt.axvline(x=analysis['mdl_transition_point'], color='r', linestyle='--', label='MDL Transition')
-            plt.axvline(x=analysis['grokking_point'], color='g', linestyle='--', label='Grokking Point')
-    
+            mdl_step = analysis["mdl_step"]
+            mdl = analysis["mdl"]
+            val_acc = analysis["val_acc"]
+
+            plt.plot(mdl_step, mdl, label=f"{labels[run]} - MDL")
+            plt.plot(mdl_step, val_acc, label=f"{labels[run]} - Val Acc")
+            plt.axvline(
+                x=analysis["mdl_transition_point"],
+                color="r",
+                linestyle="--",
+                label="MDL Transition",
+            )
+            plt.axvline(
+                x=analysis["grokking_point"],
+                color="g",
+                linestyle="--",
+                label="Grokking Point",
+            )
+
     plt.title(f"MDL Evolution and Validation Accuracy - {dataset}")
     plt.xlabel("Steps")
     plt.ylabel("MDL / Validation Accuracy")
@@ -469,19 +524,25 @@ for dataset in datasets:
                 grok_ps.append(grok_p)
             if correlation is not None:
                 correlations.append(correlation)
-    
+
     avg_mdl_tp = np.mean(mdl_tps) if mdl_tps else None
     avg_grok_p = np.mean(grok_ps) if grok_ps else None
     avg_correlation = np.mean(correlations) if correlations else None
-    
+
     print(f"\nDataset: {dataset}")
-    print(f"  Average MDL Transition Point: {avg_mdl_tp:.2f if avg_mdl_tp is not None else 'N/A'}")
-    print(f"  Average Grokking Point: {avg_grok_p:.2f if avg_grok_p is not None else 'N/A'}")
+    print(
+        f"  Average MDL Transition Point: {avg_mdl_tp:.2f if avg_mdl_tp is not None else 'N/A'}"
+    )
+    print(
+        f"  Average Grokking Point: {avg_grok_p:.2f if avg_grok_p is not None else 'N/A'}"
+    )
     if avg_mdl_tp is not None and avg_grok_p is not None:
         print(f"  Difference: {abs(avg_mdl_tp - avg_grok_p):.2f}")
     else:
         print("  Difference: N/A")
-    print(f"  Average Correlation: {avg_correlation:.4f if avg_correlation is not None else 'N/A'}")
+    print(
+        f"  Average Correlation: {avg_correlation:.4f if avg_correlation is not None else 'N/A'}"
+    )
 
     # Add these lines for debugging
     print(f"  MDL Transition Points: {mdl_tps}")

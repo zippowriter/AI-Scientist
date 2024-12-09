@@ -30,7 +30,6 @@ class LayerNorm(nn.Module):
 
 
 class CausalSelfAttention(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         assert config.n_embd % config.n_head == 0
@@ -103,7 +102,6 @@ class CausalSelfAttention(nn.Module):
 
 
 class MLP(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
@@ -120,7 +118,6 @@ class MLP(nn.Module):
 
 
 class Block(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.ln_1 = LayerNorm(config.n_embd, bias=config.bias)
@@ -137,20 +134,15 @@ class Block(nn.Module):
 @dataclass
 class GPTConfig:
     block_size: int = 1024
-    vocab_size: int = (
-        50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-    )
+    vocab_size: int = 50304  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
     dropout: float = 0.0
-    bias: bool = (
-        True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
-    )
+    bias: bool = True  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
 
 
 class GPT(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         assert config.vocab_size is not None
@@ -211,7 +203,7 @@ class GPT(nn.Module):
         device = idx.device
         b, t = idx.size()
         assert (
-                t <= self.config.block_size
+            t <= self.config.block_size
         ), f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
         pos = torch.arange(0, t, dtype=torch.long, device=device)  # shape (t)
 
@@ -295,7 +287,7 @@ class GPT(nn.Module):
             idx_cond = (
                 idx
                 if idx.size(1) <= self.config.block_size
-                else idx[:, -self.config.block_size:]
+                else idx[:, -self.config.block_size :]
             )
             # forward the model to get the logits for the index in the sequence
             logits, _ = self(idx_cond)
@@ -404,18 +396,19 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
             )
         ix = torch.randint(len(data) - block_size, (batch_size,))
         x = torch.stack(
-            [torch.from_numpy((data[i: i + block_size]).astype(np.int64)) for i in ix]
+            [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
         )
         y = torch.stack(
             [
-                torch.from_numpy((data[i + 1: i + 1 + block_size]).astype(np.int64))
+                torch.from_numpy((data[i + 1 : i + 1 + block_size]).astype(np.int64))
                 for i in ix
             ]
         )
         if device_type == "cuda":
             # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(
-                device, non_blocking=True
+            x, y = (
+                x.pin_memory().to(device, non_blocking=True),
+                y.pin_memory().to(device, non_blocking=True),
             )
         else:
             x, y = x.to(device), y.to(device)
@@ -517,7 +510,6 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model
     while True:
-
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if decay_lr else learning_rate
         for param_group in optimizer.param_groups:
@@ -558,7 +550,7 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
             with ctx:
                 logits, loss = model(X, Y)
                 loss = (
-                        loss / gradient_accumulation_steps
+                    loss / gradient_accumulation_steps
                 )  # scale the loss to account for gradient accumulation
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
             X, Y = get_batch("train")
@@ -674,7 +666,7 @@ def train(dataset="shakespeare_char", out_dir="run_0", seed_offset=0):
     final_info["avg_inference_tokens_per_second"] = avg_tokens_per_second
 
     with open(
-            os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w"
+        os.path.join(out_dir, f"final_info_{dataset}_{seed_offset}.json"), "w"
     ) as f:
         json.dump(final_info, f)
     return final_info, train_log_info, val_log_info

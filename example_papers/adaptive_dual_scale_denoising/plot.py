@@ -1,10 +1,12 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
 import pickle
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["circle", "dino", "line", "moons"]
@@ -13,13 +15,13 @@ final_results = {}
 train_info = {}
 
 
-def smooth(x, window_len=10, window='hanning'):
-    s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
-    if window == 'flat':  # moving average
-        w = np.ones(window_len, 'd')
+def smooth(x, window_len=10, window="hanning"):
+    s = np.r_[x[window_len - 1 : 0 : -1], x, x[-2 : -window_len - 1 : -1]]
+    if window == "flat":  # moving average
+        w = np.ones(window_len, "d")
     else:
         w = getattr(np, window)(window_len)
-    y = np.convolve(w / w.sum(), s, mode='valid')
+    y = np.convolve(w / w.sum(), s, mode="valid")
     return y
 
 
@@ -37,7 +39,7 @@ labels = {
     "run_2": "Learnable Weighting",
     "run_3": "Weight Analysis",
     "run_4": "Weight Visualization",
-    "run_5": "Improved Weight Network"
+    "run_5": "Improved Weight Network",
 }
 
 # Use only the runs specified in the labels dictionary
@@ -46,9 +48,12 @@ runs = list(labels.keys())
 
 # CREATE PLOTS
 
+
 # Create a programmatic color palette
 def generate_color_palette(n):
-    cmap = plt.get_cmap('tab20')  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
+    cmap = plt.get_cmap(
+        "tab20"
+    )  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
     return [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, n)]
 
 
@@ -105,12 +110,23 @@ for j, dataset in enumerate(datasets):
     row = j // 2
     col = j % 2
     for i, run in enumerate(runs):
-        if 'weight_evolution' in train_info[run][dataset]:
-            weight_evolution = train_info[run][dataset]['weight_evolution']
+        if "weight_evolution" in train_info[run][dataset]:
+            weight_evolution = train_info[run][dataset]["weight_evolution"]
             timesteps = range(len(weight_evolution))
-            axs[row, col].plot(timesteps, weight_evolution[:, 0], label=f'{labels[run]} - Global', color=colors[i])
-            axs[row, col].plot(timesteps, weight_evolution[:, 1], label=f'{labels[run]} - Local', color=colors[i], linestyle='--')
-    
+            axs[row, col].plot(
+                timesteps,
+                weight_evolution[:, 0],
+                label=f"{labels[run]} - Global",
+                color=colors[i],
+            )
+            axs[row, col].plot(
+                timesteps,
+                weight_evolution[:, 1],
+                label=f"{labels[run]} - Local",
+                color=colors[i],
+                linestyle="--",
+            )
+
     axs[row, col].set_title(dataset)
     axs[row, col].set_xlabel("Timestep")
     axs[row, col].set_ylabel("Weight")

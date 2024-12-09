@@ -1,9 +1,11 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["x_div_y", "x_minus_y", "x_plus_y", "permutation"]
@@ -167,29 +169,35 @@ for dataset in datasets:
     plt.savefig(f"val_acc_{dataset}.png")
     plt.close()
 
+
 # Plot 5: Summary plot comparing all initialization methods across datasets
 def plot_summary(final_results, labels, datasets):
-    metrics = ['final_train_acc_mean', 'final_val_acc_mean', 'step_val_acc_99_mean']
-    fig, axs = plt.subplots(len(metrics), 1, figsize=(12, 5*len(metrics)), sharex=True)
-    
+    metrics = ["final_train_acc_mean", "final_val_acc_mean", "step_val_acc_99_mean"]
+    fig, axs = plt.subplots(
+        len(metrics), 1, figsize=(12, 5 * len(metrics)), sharex=True
+    )
+
     x = np.arange(len(datasets))
     width = 0.15
     n_runs = len(labels)
-    
+
     for i, metric in enumerate(metrics):
         for j, (run, label) in enumerate(labels.items()):
-            values = [final_results[run][dataset]['means'][metric] for dataset in datasets]
-            axs[i].bar(x + (j - n_runs/2 + 0.5) * width, values, width, label=label)
-        
-        axs[i].set_ylabel(metric.replace('_', ' ').title())
+            values = [
+                final_results[run][dataset]["means"][metric] for dataset in datasets
+            ]
+            axs[i].bar(x + (j - n_runs / 2 + 0.5) * width, values, width, label=label)
+
+        axs[i].set_ylabel(metric.replace("_", " ").title())
         axs[i].set_xticks(x)
         axs[i].set_xticklabels(datasets)
-        axs[i].legend(loc='upper left', bbox_to_anchor=(1, 1))
+        axs[i].legend(loc="upper left", bbox_to_anchor=(1, 1))
         axs[i].grid(True, which="both", ls="-", alpha=0.2)
-    
+
     plt.tight_layout()
-    plt.savefig("summary_plot.png", bbox_inches='tight')
+    plt.savefig("summary_plot.png", bbox_inches="tight")
     plt.close()
+
 
 # Call the summary plot function
 plot_summary(final_results, labels, datasets)

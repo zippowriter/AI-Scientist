@@ -1,11 +1,13 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
 import pickle
 import warnings
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["circle", "dino", "line", "moons"]
@@ -14,13 +16,13 @@ final_results = {}
 train_info = {}
 
 
-def smooth(x, window_len=10, window='hanning'):
-    s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
-    if window == 'flat':  # moving average
-        w = np.ones(window_len, 'd')
+def smooth(x, window_len=10, window="hanning"):
+    s = np.r_[x[window_len - 1 : 0 : -1], x, x[-2 : -window_len - 1 : -1]]
+    if window == "flat":  # moving average
+        w = np.ones(window_len, "d")
     else:
         w = getattr(np, window)(window_len)
-    y = np.convolve(w / w.sum(), s, mode='valid')
+    y = np.convolve(w / w.sum(), s, mode="valid")
     return y
 
 
@@ -51,9 +53,12 @@ for run in runs:
 
 # CREATE PLOTS
 
+
 # Create a programmatic color palette
 def generate_color_palette(n):
-    cmap = plt.get_cmap('tab20')  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
+    cmap = plt.get_cmap(
+        "tab20"
+    )  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
     return [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, n)]
 
 
@@ -71,25 +76,39 @@ multiplier = 0
 for run, label in labels.items():
     kl_values = []
     for dataset in datasets:
-        kl_value = final_results[run][dataset].get('means', {}).get('kl_divergence', 0)
+        kl_value = final_results[run][dataset].get("means", {}).get("kl_divergence", 0)
         if kl_value == 0:
-            warnings.warn(f"KL divergence value missing for {run} on {dataset} dataset.")
+            warnings.warn(
+                f"KL divergence value missing for {run} on {dataset} dataset."
+            )
         kl_values.append(kl_value)
     offset = width * multiplier
     rects = ax.bar(x + offset, kl_values, width, label=label)
-    ax.bar_label(rects, padding=3, rotation=90, fmt='%.3f')
+    ax.bar_label(rects, padding=3, rotation=90, fmt="%.3f")
     multiplier += 1
 
-ax.set_ylabel('KL Divergence')
-ax.set_title('KL Divergence Comparison Across Runs')
+ax.set_ylabel("KL Divergence")
+ax.set_title("KL Divergence Comparison Across Runs")
 ax.set_xticks(x + width * (len(labels) - 1) / 2)
 ax.set_xticklabels(datasets)
-ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-max_kl = max([max([final_results[run][dataset].get('means', {}).get('kl_divergence', 0) for dataset in datasets]) for run in labels])
+ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
+max_kl = max(
+    [
+        max(
+            [
+                final_results[run][dataset].get("means", {}).get("kl_divergence", 0)
+                for dataset in datasets
+            ]
+        )
+        for run in labels
+    ]
+)
 if max_kl > 0:
     ax.set_ylim(0, max_kl * 1.2)
 else:
-    ax.set_ylim(0, 1)  # Set a default y-axis limit if all KL divergence values are 0 or missing
+    ax.set_ylim(
+        0, 1
+    )  # Set a default y-axis limit if all KL divergence values are 0 or missing
 
 plt.tight_layout()
 plt.savefig("kl_divergence_comparison.png")
@@ -102,12 +121,20 @@ fig.suptitle("Generated Samples for 'dino' Dataset", fontsize=16)
 for i, (run, label) in enumerate(labels.items()):
     row = i // 3
     col = i % 3
-    images = train_info[run]['dino']["images"]
-    gating_weights = train_info[run]['dino'].get("gating_weights")
-    
-    scatter = axs[row, col].scatter(images[:, 0], images[:, 1], c=gating_weights, cmap='coolwarm', alpha=0.5, vmin=0, vmax=1)
+    images = train_info[run]["dino"]["images"]
+    gating_weights = train_info[run]["dino"].get("gating_weights")
+
+    scatter = axs[row, col].scatter(
+        images[:, 0],
+        images[:, 1],
+        c=gating_weights,
+        cmap="coolwarm",
+        alpha=0.5,
+        vmin=0,
+        vmax=1,
+    )
     axs[row, col].set_title(label)
-    fig.colorbar(scatter, ax=axs[row, col], label='Gating Weight')
+    fig.colorbar(scatter, ax=axs[row, col], label="Gating Weight")
 
 plt.tight_layout()
 plt.savefig("dino_generated_samples.png")
@@ -117,7 +144,7 @@ plt.show()
 fig, ax = plt.subplots(figsize=(12, 6))
 
 for run, label in labels.items():
-    mean = train_info[run]['dino']["train_losses"]
+    mean = train_info[run]["dino"]["train_losses"]
     mean = smooth(mean, window_len=25)
     ax.plot(mean, label=label)
 
@@ -137,8 +164,8 @@ fig.suptitle("Gating Weights Histogram for 'dino' Dataset", fontsize=16)
 for i, (run, label) in enumerate(labels.items()):
     row = i // 3
     col = i % 3
-    gating_weights = train_info[run]['dino'].get("gating_weights")
-    
+    gating_weights = train_info[run]["dino"].get("gating_weights")
+
     if gating_weights is not None:
         axs[row, col].hist(gating_weights, bins=50, range=(0, 1))
         axs[row, col].set_title(label)

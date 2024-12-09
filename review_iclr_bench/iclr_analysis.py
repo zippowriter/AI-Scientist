@@ -4,24 +4,28 @@ python iclr_analysis.py --num_reviews 500  --batch_size 50 --num_fs_examples 0 -
 
 import sys
 
+
 sys.path.append("../")
+
+import argparse
+import multiprocessing as mp
+import os
+import pathlib
+import time
+
+import numpy as np
+import pandas as pd
+import requests
+
+from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
+from sklearn.utils import shuffle
 
 from ai_scientist.perform_review import (
     load_paper,
+    neurips_form,
     perform_review,
     reviewer_system_prompt_neg,
-    neurips_form,
 )
-import pathlib
-import pandas as pd
-import numpy as np
-import requests
-import argparse
-import os
-import time
-import multiprocessing as mp
-from sklearn.utils import shuffle
-from sklearn.metrics import f1_score, roc_auc_score, confusion_matrix
 
 
 def parse_arguments():

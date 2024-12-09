@@ -5,10 +5,16 @@ import os.path as osp
 import re
 import shutil
 import subprocess
+
 from typing import Optional, Tuple
 
 from ai_scientist.generate_ideas import search_for_papers
-from ai_scientist.llm import get_response_from_llm, extract_json_between_markers, create_client, AVAILABLE_LLMS
+from ai_scientist.llm import (
+    AVAILABLE_LLMS,
+    create_client,
+    extract_json_between_markers,
+    get_response_from_llm,
+)
 
 
 # GENERATE LATEX
@@ -131,7 +137,7 @@ per_section_tips = {
     "Abstract": """
 - TL;DR of the paper
 - What are we trying to do and why is it relevant?
-- Why is this hard? 
+- Why is this hard?
 - How do we solve it (i.e. our contribution!)
 - How do we verify that we solved it (e.g. Experiments and results)
 
@@ -140,20 +146,20 @@ Please make sure the abstract reads smoothly and is well-motivated. This should 
     "Introduction": """
 - Longer version of the Abstract, i.e. of the entire paper
 - What are we trying to do and why is it relevant?
-- Why is this hard? 
+- Why is this hard?
 - How do we solve it (i.e. our contribution!)
 - How do we verify that we solved it (e.g. Experiments and results)
 - New trend: specifically list your contributions as bullet points
 - Extra space? Future work!
 """,
     "Related Work": """
-- Academic siblings of our work, i.e. alternative attempts in literature at trying to solve the same problem. 
-- Goal is to “Compare and contrast” - how does their approach differ in either assumptions or method? If their method is applicable to our Problem Setting I expect a comparison in the experimental section. If not, there needs to be a clear statement why a given method is not applicable. 
+- Academic siblings of our work, i.e. alternative attempts in literature at trying to solve the same problem.
+- Goal is to “Compare and contrast” - how does their approach differ in either assumptions or method? If their method is applicable to our Problem Setting I expect a comparison in the experimental section. If not, there needs to be a clear statement why a given method is not applicable.
 - Note: Just describing what another paper is doing is not enough. We need to compare and contrast.
 """,
     "Background": """
-- Academic Ancestors of our work, i.e. all concepts and prior work that are required for understanding our method. 
-- Usually includes a subsection, Problem Setting, which formally introduces the problem setting and notation (Formalism) for our method. Highlights any specific assumptions that are made that are unusual. 
+- Academic Ancestors of our work, i.e. all concepts and prior work that are required for understanding our method.
+- Usually includes a subsection, Problem Setting, which formally introduces the problem setting and notation (Formalism) for our method. Highlights any specific assumptions that are made that are unusual.
 - Note: If our paper introduces a novel problem setting as part of its contributions, it's best to have a separate Section.
 """,
     "Method": """
@@ -168,7 +174,7 @@ Please make sure the abstract reads smoothly and is well-motivated. This should 
 - Shows the results of running Method on our problem described in Experimental Setup.
 - Includes statements on hyperparameters and other potential issues of fairness.
 - Only includes results that have actually been run and saved in the logs. Do not hallucinate results that don't exist.
-- If results exist: compares to baselines and includes statistics and confidence intervals. 
+- If results exist: compares to baselines and includes statistics and confidence intervals.
 - If results exist: includes ablation studies to show that specific parts of the method are relevant.
 - Discusses limitations of the method.
 - Make sure to include all the results from the experiments, and include all relevant figures.
@@ -294,7 +300,7 @@ This JSON will be automatically parsed, so ensure the format is precise."""
 
 
 def get_citation_aider_prompt(
-        client, model, draft, current_round, total_rounds
+    client, model, draft, current_round, total_rounds
 ) -> Tuple[Optional[str], bool]:
     msg_history = []
     try:
@@ -391,15 +397,15 @@ Make sure that any citation precisely matches the name in `references.bib`. Chan
 Ensure the citation is well-integrated into the text.'''
 
     aider_prompt = (
-            aider_format.format(bibtex=bibtex_string, description=desc)
-            + """\n You must use \cite or \citet to reference papers, do not manually type out author names."""
+        aider_format.format(bibtex=bibtex_string, description=desc)
+        + """\n You must use \cite or \citet to reference papers, do not manually type out author names."""
     )
     return aider_prompt, False
 
 
 # PERFORM WRITEUP
 def perform_writeup(
-        idea, folder_name, coder, cite_client, cite_model, num_cite_rounds=20
+    idea, folder_name, coder, cite_client, cite_model, num_cite_rounds=20
 ):
     # CURRENTLY ASSUMES LATEX
     abstract_prompt = f"""We've provided the `latex/template.tex` file to the project. We will be filling it in section by section.
@@ -513,10 +519,11 @@ First, re-think the Title if necessary. Keep this concise and descriptive of the
 
 
 if __name__ == "__main__":
-    from aider.coders import Coder
-    from aider.models import Model
-    from aider.io import InputOutput
     import json
+
+    from aider.coders import Coder
+    from aider.io import InputOutput
+    from aider.models import Model
 
     parser = argparse.ArgumentParser(description="Perform writeup for a project")
     parser.add_argument("--folder", type=str)

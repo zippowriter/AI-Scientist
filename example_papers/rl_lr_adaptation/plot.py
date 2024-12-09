@@ -1,9 +1,11 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["shakespeare_char", "enwik8", "text8"]
@@ -14,7 +16,9 @@ for folder in folders:
     if folder.startswith("run") and osp.isdir(folder):
         with open(osp.join(folder, "final_info.json"), "r") as f:
             final_results[folder] = json.load(f)
-        results_dict = np.load(osp.join(folder, "all_results.npy"), allow_pickle=True).item()
+        results_dict = np.load(
+            osp.join(folder, "all_results.npy"), allow_pickle=True
+        ).item()
         run_info = {}
         for dataset in datasets:
             run_info[dataset] = {}
@@ -22,14 +26,22 @@ for folder in folders:
             train_losses = []
             for k in results_dict.keys():
                 if dataset in k and "val_info" in k:
-                    run_info[dataset]["iters"] = [info["iter"] for info in results_dict[k]]
+                    run_info[dataset]["iters"] = [
+                        info["iter"] for info in results_dict[k]
+                    ]
                     val_losses.append([info["val/loss"] for info in results_dict[k]])
-                    train_losses.append([info["train/loss"] for info in results_dict[k]])
+                    train_losses.append(
+                        [info["train/loss"] for info in results_dict[k]]
+                    )
                 mean_val_losses = np.mean(val_losses, axis=0)
                 mean_train_losses = np.mean(train_losses, axis=0)
                 if len(val_losses) > 0:
-                    sterr_val_losses = np.std(val_losses, axis=0) / np.sqrt(len(val_losses))
-                    stderr_train_losses = np.std(train_losses, axis=0) / np.sqrt(len(train_losses))
+                    sterr_val_losses = np.std(val_losses, axis=0) / np.sqrt(
+                        len(val_losses)
+                    )
+                    stderr_train_losses = np.std(train_losses, axis=0) / np.sqrt(
+                        len(train_losses)
+                    )
                 else:
                     sterr_val_losses = np.zeros_like(mean_val_losses)
                     stderr_train_losses = np.zeros_like(mean_train_losses)
@@ -48,10 +60,12 @@ labels = {
     "run_4": "Q-learning with epsilon decay strategy",
 }
 
+
 # Create a programmatic color palette
 def generate_color_palette(n):
-    cmap = plt.get_cmap('tab20')
+    cmap = plt.get_cmap("tab20")
     return [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, n)]
+
 
 # Get the list of runs and generate the color palette
 runs = list(labels.keys())

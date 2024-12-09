@@ -1,10 +1,12 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
 import pickle
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["circle", "dino", "line", "moons"]
@@ -13,13 +15,13 @@ final_results = {}
 train_info = {}
 
 
-def smooth(x, window_len=10, window='hanning'):
-    s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
-    if window == 'flat':  # moving average
-        w = np.ones(window_len, 'd')
+def smooth(x, window_len=10, window="hanning"):
+    s = np.r_[x[window_len - 1 : 0 : -1], x, x[-2 : -window_len - 1 : -1]]
+    if window == "flat":  # moving average
+        w = np.ones(window_len, "d")
     else:
         w = getattr(np, window)(window_len)
-    y = np.convolve(w / w.sum(), s, mode='valid')
+    y = np.convolve(w / w.sum(), s, mode="valid")
     return y
 
 
@@ -47,9 +49,12 @@ for run in runs:
 
 # CREATE PLOTS
 
+
 # Create a programmatic color palette
 def generate_color_palette(n):
-    cmap = plt.get_cmap('tab20')  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
+    cmap = plt.get_cmap(
+        "tab20"
+    )  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
     return [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, n)]
 
 
@@ -90,7 +95,9 @@ for i, run in enumerate(runs):
                 axs[j].scatter(images[:, 0], images[:, 1], alpha=0.2, color=colors[i])
                 axs[j].set_title(dataset)
             else:
-                axs[i, j].scatter(images[:, 0], images[:, 1], alpha=0.2, color=colors[i])
+                axs[i, j].scatter(
+                    images[:, 0], images[:, 1], alpha=0.2, color=colors[i]
+                )
                 axs[i, j].set_title(dataset)
         if num_runs == 1:
             axs[0].set_ylabel(labels[run])

@@ -3,13 +3,13 @@ import os
 import os.path as osp
 import pickle
 
-import PIL
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+import PIL
 
 
-def plot_drawing(sequence, step, name='_output_'):
+def plot_drawing(sequence, step, name="_output_"):
     """Plot drawing with separated strokes."""
     strokes = np.split(sequence, np.where(sequence[:, 2] > 0)[0] + 1)
     fig = plt.figure()
@@ -19,9 +19,9 @@ def plot_drawing(sequence, step, name='_output_'):
     canvas = plt.get_current_fig_manager().canvas
     canvas.draw()
     pil_image = PIL.Image.frombytes(
-        'RGB', canvas.get_width_height(), canvas.tostring_rgb()
+        "RGB", canvas.get_width_height(), canvas.tostring_rgb()
     )
-    name = str(step) + name + '.jpg'
+    name = str(step) + name + ".jpg"
     pil_image.save(name, "JPEG")
     plt.close("all")
 
@@ -33,13 +33,13 @@ final_results = {}
 train_info = {}
 
 
-def smooth(x, window_len=10, window='hanning'):
-    s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
-    if window == 'flat':  # moving average
-        w = np.ones(window_len, 'd')
+def smooth(x, window_len=10, window="hanning"):
+    s = np.r_[x[window_len - 1 : 0 : -1], x, x[-2 : -window_len - 1 : -1]]
+    if window == "flat":  # moving average
+        w = np.ones(window_len, "d")
     else:
         w = getattr(np, window)(window_len)
-    y = np.convolve(w / w.sum(), s, mode='valid')
+    y = np.convolve(w / w.sum(), s, mode="valid")
     return y
 
 
@@ -65,9 +65,12 @@ for run in runs:
 
 # CREATE PLOTS
 
+
 # Create a programmatic color palette
 def generate_color_palette(n):
-    cmap = plt.get_cmap('tab20')  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
+    cmap = plt.get_cmap(
+        "tab20"
+    )  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
     return [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, n)]
 
 

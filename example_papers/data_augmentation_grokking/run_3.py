@@ -1,15 +1,18 @@
-import argparse
 import abc
+import argparse
+import json
+import os
 import random
+
 from itertools import permutations
 from typing import Set
-import os
-import json
+
 import numpy as np
-from einops import rearrange, repeat
 import torch
+
+from einops import rearrange, repeat
+from torch import Tensor, nn
 from torch.utils.data import IterableDataset
-from torch import nn, Tensor
 
 
 class AbstractDataset(abc.ABC):
@@ -264,7 +267,16 @@ class Transformer(torch.nn.Module):
         return self.model(embedding)
 
 
-def train(model, train_loader, val_loader, optimizer, scheduler, device, num_train_batches, num_eval_batches):
+def train(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    scheduler,
+    device,
+    num_train_batches,
+    num_eval_batches,
+):
     # Set model to training mode
     model.train()
     criterion = torch.nn.CrossEntropyLoss()
@@ -305,7 +317,7 @@ def train(model, train_loader, val_loader, optimizer, scheduler, device, num_tra
         if count % 100 == 0:
             val_metrics = evaluate(model, val_loader, device, num_eval_batches)
             val_acc = val_metrics["val_accuracy"]
-            
+
             # Check for 95% validation accuracy
             if step_val_acc_95 is None and val_acc >= 0.95:
                 step_val_acc_95 = count * num_train_batches
@@ -341,7 +353,6 @@ def evaluate(model, val_loader, device, num_eval_batches):
     count = 0
     # Loop over each batch from the validation set
     for batch in val_loader:
-
         # Copy data to device if needed
         batch = tuple(t.to(device) for t in batch)
 
@@ -431,7 +442,9 @@ def run(out_dir, dataset, seed_offset):
         "final_val_loss": val_metrics["val_loss"],
         "final_train_acc": train_metrics["train_accuracy"],
         "final_val_acc": val_metrics["val_accuracy"],
-        "step_val_acc_99": step_val_acc_99 if step_val_acc_99 != num_total_updates else None,
+        "step_val_acc_99": step_val_acc_99
+        if step_val_acc_99 != num_total_updates
+        else None,
         "step_val_acc_95": train_metrics["step_val_acc_95"],
         "max_acc_increase_rate": train_metrics["max_acc_increase_rate"],
     }
@@ -469,11 +482,15 @@ if __name__ == "__main__":
             all_results[f"{dataset}_{seed_offset}_val_info"] = val_info
             final_info_list.append(final_info)
         final_info_dict = {
-            k: [d[k] for d in final_info_list if d[k] is not None] for k in final_info_list[0].keys()
+            k: [d[k] for d in final_info_list if d[k] is not None]
+            for k in final_info_list[0].keys()
         }
-        means = {f"{k}_mean": np.mean(v) if v else None for k, v in final_info_dict.items()}
+        means = {
+            f"{k}_mean": np.mean(v) if v else None for k, v in final_info_dict.items()
+        }
         stderrs = {
-            f"{k}_stderr": np.std(v) / np.sqrt(len(v)) if v else None for k, v in final_info_dict.items()
+            f"{k}_stderr": np.std(v) / np.sqrt(len(v)) if v else None
+            for k, v in final_info_dict.items()
         }
         final_infos[dataset] = {
             "means": means,

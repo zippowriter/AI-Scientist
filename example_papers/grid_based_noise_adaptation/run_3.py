@@ -2,34 +2,38 @@
 
 import argparse
 import json
-import time
 import os.path as osp
-import numpy as np
-from tqdm.auto import tqdm
-import npeet.entropy_estimators as ee
-import pickle
 import pathlib
-
-import torch
-from torch import nn
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from ema_pytorch import EMA
+import pickle
+import time
 
 import datasets
 import matplotlib.pyplot as plt
+import npeet.entropy_estimators as ee
+import numpy as np
+import torch
+
+from torch import nn
+from torch.nn import functional as F
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
+
+from .ema_pytorch import EMA
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def calculate_grid_variance(grid):
     return torch.var(grid).item()
 
+
 def visualize_grid(grid, timestep, save_path):
     plt.figure(figsize=(10, 8))
-    plt.imshow(grid.detach().cpu().numpy(), cmap='viridis')
+    plt.imshow(grid.detach().cpu().numpy(), cmap="viridis")
     plt.colorbar()
-    plt.title(f'Noise Adjustment Grid at Timestep {timestep}')
+    plt.title(f"Noise Adjustment Grid at Timestep {timestep}")
     plt.savefig(save_path)
     plt.close()
 
@@ -62,10 +66,10 @@ class ResidualBlock(nn.Module):
 
 class MLPDenoiser(nn.Module):
     def __init__(
-            self,
-            embedding_dim: int = 128,
-            hidden_dim: int = 256,
-            hidden_layers: int = 3,
+        self,
+        embedding_dim: int = 128,
+        hidden_dim: int = 256,
+        hidden_layers: int = 3,
     ):
         super().__init__()
         self.time_mlp = SinusoidalEmbedding(embedding_dim)
@@ -74,7 +78,9 @@ class MLPDenoiser(nn.Module):
         self.input_mlp2 = SinusoidalEmbedding(embedding_dim, scale=25.0)
 
         self.network = nn.Sequential(
-            nn.Linear(embedding_dim * 3 + 1, hidden_dim),  # +1 for noise adjustment factor
+            nn.Linear(
+                embedding_dim * 3 + 1, hidden_dim
+            ),  # +1 for noise adjustment factor
             *[ResidualBlock(hidden_dim) for _ in range(hidden_layers)],
             nn.ReLU(),
             nn.Linear(hidden_dim, 2),
@@ -88,58 +94,86 @@ class MLPDenoiser(nn.Module):
         return self.network(emb)
 
 
-class NoiseScheduler():
+class NoiseScheduler:
     def __init__(
-            self,
-            num_timesteps=1000,
-            beta_start=0.0001,
-            beta_end=0.02,
-            beta_schedule="linear",
-            coarse_grid_size=5,
-            fine_grid_size=20,
+        self,
+        num_timesteps=1000,
+        beta_start=0.0001,
+        beta_end=0.02,
+        beta_schedule="linear",
+        coarse_grid_size=5,
+        fine_grid_size=20,
     ):
         self.num_timesteps = num_timesteps
         self.coarse_grid_size = coarse_grid_size
         self.fine_grid_size = fine_grid_size
         if beta_schedule == "linear":
             self.betas = torch.linspace(
-                beta_start, beta_end, num_timesteps, dtype=torch.float32).to(device)
+                beta_start, beta_end, num_timesteps, dtype=torch.float32
+            ).to(device)
         elif beta_schedule == "quadratic":
-            self.betas = (torch.linspace(
-                beta_start ** 0.5, beta_end ** 0.5, num_timesteps, dtype=torch.float32) ** 2).to(device)
+            self.betas = (
+                torch.linspace(
+                    beta_start**0.5, beta_end**0.5, num_timesteps, dtype=torch.float32
+                )
+                ** 2
+            ).to(device)
         else:
             raise ValueError(f"Unknown beta schedule: {beta_schedule}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = torch.cumprod(self.alphas, axis=0).to(device)
-        self.alphas_cumprod_prev = F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.).to(device)
+        self.alphas_cumprod_prev = F.pad(
+            self.alphas_cumprod[:-1], (1, 0), value=1.0
+        ).to(device)
 
         # required for self.add_noise
-        self.sqrt_alphas_cumprod = (self.alphas_cumprod ** 0.5).to(device)
-        self.sqrt_one_minus_alphas_cumprod = ((1 - self.alphas_cumprod) ** 0.5).to(device)
+        self.sqrt_alphas_cumprod = (self.alphas_cumprod**0.5).to(device)
+        self.sqrt_one_minus_alphas_cumprod = ((1 - self.alphas_cumprod) ** 0.5).to(
+            device
+        )
 
         # required for reconstruct_x0
         self.sqrt_inv_alphas_cumprod = torch.sqrt(1 / self.alphas_cumprod).to(device)
         self.sqrt_inv_alphas_cumprod_minus_one = torch.sqrt(
-            1 / self.alphas_cumprod - 1).to(device)
+            1 / self.alphas_cumprod - 1
+        ).to(device)
 
         # required for q_posterior
-        self.posterior_mean_coef1 = self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1. - self.alphas_cumprod).to(
-            device)
-        self.posterior_mean_coef2 = ((1. - self.alphas_cumprod_prev) * torch.sqrt(self.alphas) / (
-                1. - self.alphas_cumprod)).to(device)
+        self.posterior_mean_coef1 = (
+            self.betas
+            * torch.sqrt(self.alphas_cumprod_prev)
+            / (1.0 - self.alphas_cumprod).to(device)
+        )
+        self.posterior_mean_coef2 = (
+            (1.0 - self.alphas_cumprod_prev)
+            * torch.sqrt(self.alphas)
+            / (1.0 - self.alphas_cumprod)
+        ).to(device)
 
         # Initialize the multi-scale grid-based noise adjustment factors
-        self.coarse_noise_grid = nn.Parameter(torch.ones(num_timesteps, coarse_grid_size, coarse_grid_size).to(device))
-        self.fine_noise_grid = nn.Parameter(torch.ones(num_timesteps, fine_grid_size, fine_grid_size).to(device))
+        self.coarse_noise_grid = nn.Parameter(
+            torch.ones(num_timesteps, coarse_grid_size, coarse_grid_size).to(device)
+        )
+        self.fine_noise_grid = nn.Parameter(
+            torch.ones(num_timesteps, fine_grid_size, fine_grid_size).to(device)
+        )
 
     def get_grid_noise_adjustment(self, t, x):
-        coarse_grid_x = torch.clamp((x[:, 0] + 1) / 2 * self.coarse_grid_size, 0, self.coarse_grid_size - 1).long()
-        coarse_grid_y = torch.clamp((x[:, 1] + 1) / 2 * self.coarse_grid_size, 0, self.coarse_grid_size - 1).long()
+        coarse_grid_x = torch.clamp(
+            (x[:, 0] + 1) / 2 * self.coarse_grid_size, 0, self.coarse_grid_size - 1
+        ).long()
+        coarse_grid_y = torch.clamp(
+            (x[:, 1] + 1) / 2 * self.coarse_grid_size, 0, self.coarse_grid_size - 1
+        ).long()
         coarse_adjustment = self.coarse_noise_grid[t, coarse_grid_x, coarse_grid_y]
 
-        fine_grid_x = torch.clamp((x[:, 0] + 1) / 2 * self.fine_grid_size, 0, self.fine_grid_size - 1).long()
-        fine_grid_y = torch.clamp((x[:, 1] + 1) / 2 * self.fine_grid_size, 0, self.fine_grid_size - 1).long()
+        fine_grid_x = torch.clamp(
+            (x[:, 0] + 1) / 2 * self.fine_grid_size, 0, self.fine_grid_size - 1
+        ).long()
+        fine_grid_y = torch.clamp(
+            (x[:, 1] + 1) / 2 * self.fine_grid_size, 0, self.fine_grid_size - 1
+        ).long()
         fine_adjustment = self.fine_noise_grid[t, fine_grid_x, fine_grid_y]
 
         return coarse_adjustment * fine_adjustment
@@ -163,7 +197,11 @@ class NoiseScheduler():
         if t == 0:
             return 0
 
-        variance = self.betas[t] * (1. - self.alphas_cumprod_prev[t]) / (1. - self.alphas_cumprod[t])
+        variance = (
+            self.betas[t]
+            * (1.0 - self.alphas_cumprod_prev[t])
+            / (1.0 - self.alphas_cumprod[t])
+        )
         variance = variance.clip(1e-20)
         return variance
 
@@ -188,7 +226,9 @@ class NoiseScheduler():
         s1 = s1.reshape(-1, 1)
         s2 = s2.reshape(-1, 1)
 
-        noise_adjustment = self.get_grid_noise_adjustment(timesteps, x_start).unsqueeze(1)
+        noise_adjustment = self.get_grid_noise_adjustment(timesteps, x_start).unsqueeze(
+            1
+        )
         return s1 * x_start + s2 * x_noise * noise_adjustment
 
     def __len__(self):
@@ -202,7 +242,9 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=3e-4)
     parser.add_argument("--num_timesteps", type=int, default=100)
     parser.add_argument("--num_train_steps", type=int, default=10000)
-    parser.add_argument("--beta_schedule", type=str, default="linear", choices=["linear", "quadratic"])
+    parser.add_argument(
+        "--beta_schedule", type=str, default="linear", choices=["linear", "quadratic"]
+    )
     parser.add_argument("--embedding_dim", type=int, default=128)
     parser.add_argument("--hidden_size", type=int, default=256)
     parser.add_argument("--hidden_layers", type=int, default=3)
@@ -216,7 +258,9 @@ if __name__ == "__main__":
 
     for dataset_name in ["circle", "dino", "line", "moons"]:
         dataset = datasets.get_dataset(dataset_name, n=100000)
-        dataloader = DataLoader(dataset, batch_size=config.train_batch_size, shuffle=True)
+        dataloader = DataLoader(
+            dataset, batch_size=config.train_batch_size, shuffle=True
+        )
 
         model = MLPDenoiser(
             embedding_dim=config.embedding_dim,
@@ -225,10 +269,13 @@ if __name__ == "__main__":
         ).to(device)
         ema_model = EMA(model, beta=0.995, update_every=10).to(device)
 
-        noise_scheduler = NoiseScheduler(num_timesteps=config.num_timesteps, beta_schedule=config.beta_schedule)
+        noise_scheduler = NoiseScheduler(
+            num_timesteps=config.num_timesteps, beta_schedule=config.beta_schedule
+        )
 
         optimizer = torch.optim.AdamW(
-            list(model.parameters()) + [noise_scheduler.coarse_noise_grid, noise_scheduler.fine_noise_grid],
+            list(model.parameters())
+            + [noise_scheduler.coarse_noise_grid, noise_scheduler.fine_noise_grid],
             lr=config.learning_rate,
         )
         scheduler = CosineAnnealingLR(optimizer, T_max=config.num_train_steps)
@@ -247,18 +294,28 @@ if __name__ == "__main__":
                     break
                 batch = batch[0].to(device)
                 noise = torch.randn(batch.shape).to(device)
-                timesteps = torch.randint(
-                    0, noise_scheduler.num_timesteps, (batch.shape[0],)
-                ).long().to(device)
+                timesteps = (
+                    torch.randint(0, noise_scheduler.num_timesteps, (batch.shape[0],))
+                    .long()
+                    .to(device)
+                )
 
                 noisy = noise_scheduler.add_noise(batch, noise, timesteps)
-                noise_adjustment = noise_scheduler.get_grid_noise_adjustment(timesteps, batch)
+                noise_adjustment = noise_scheduler.get_grid_noise_adjustment(
+                    timesteps, batch
+                )
                 noise_pred = model(noisy, timesteps, noise_adjustment)
                 loss = F.mse_loss(noise_pred, noise)
                 loss.backward()
 
                 nn.utils.clip_grad_norm_(model.parameters(), 0.5)
-                nn.utils.clip_grad_norm_([noise_scheduler.coarse_noise_grid, noise_scheduler.fine_noise_grid], 0.5)
+                nn.utils.clip_grad_norm_(
+                    [
+                        noise_scheduler.coarse_noise_grid,
+                        noise_scheduler.fine_noise_grid,
+                    ],
+                    0.5,
+                )
                 optimizer.step()
                 optimizer.zero_grad()
                 ema_model.update()
@@ -271,10 +328,22 @@ if __name__ == "__main__":
                 global_step += 1
 
                 if global_step % 1000 == 0:
-                    visualize_grid(noise_scheduler.coarse_noise_grid[timesteps[0]], timesteps[0], 
-                                   osp.join(config.out_dir, f"{dataset_name}_coarse_grid_step_{global_step}.png"))
-                    visualize_grid(noise_scheduler.fine_noise_grid[timesteps[0]], timesteps[0], 
-                                   osp.join(config.out_dir, f"{dataset_name}_fine_grid_step_{global_step}.png"))
+                    visualize_grid(
+                        noise_scheduler.coarse_noise_grid[timesteps[0]],
+                        timesteps[0],
+                        osp.join(
+                            config.out_dir,
+                            f"{dataset_name}_coarse_grid_step_{global_step}.png",
+                        ),
+                    )
+                    visualize_grid(
+                        noise_scheduler.fine_noise_grid[timesteps[0]],
+                        timesteps[0],
+                        osp.join(
+                            config.out_dir,
+                            f"{dataset_name}_fine_grid_step_{global_step}.png",
+                        ),
+                    )
 
         progress_bar.close()
         end_time = time.time()
@@ -286,11 +355,15 @@ if __name__ == "__main__":
         for batch in dataloader:
             batch = batch[0].to(device)
             noise = torch.randn(batch.shape).to(device)
-            timesteps = torch.randint(
-                0, noise_scheduler.num_timesteps, (batch.shape[0],)
-            ).long().to(device)
+            timesteps = (
+                torch.randint(0, noise_scheduler.num_timesteps, (batch.shape[0],))
+                .long()
+                .to(device)
+            )
             noisy = noise_scheduler.add_noise(batch, noise, timesteps)
-            noise_adjustment = noise_scheduler.get_grid_noise_adjustment(timesteps, batch)
+            noise_adjustment = noise_scheduler.get_grid_noise_adjustment(
+                timesteps, batch
+            )
             noise_pred = model(noisy, timesteps, noise_adjustment)
             loss = F.mse_loss(noise_pred, noise)
             eval_losses.append(loss.detach().item())
@@ -316,7 +389,9 @@ if __name__ == "__main__":
         kl_divergence = ee.kldiv(real_data, sample, k=5)
 
         # Calculate noise adaptation effectiveness
-        coarse_grid_variance = calculate_grid_variance(noise_scheduler.coarse_noise_grid)
+        coarse_grid_variance = calculate_grid_variance(
+            noise_scheduler.coarse_noise_grid
+        )
         fine_grid_variance = calculate_grid_variance(noise_scheduler.fine_noise_grid)
 
         final_infos[dataset_name] = {

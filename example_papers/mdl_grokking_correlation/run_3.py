@@ -1,16 +1,18 @@
-import argparse
 import abc
+import argparse
+import json
+import os
 import random
+
 from itertools import permutations
 from typing import Set
-import os
-import json
+
 import numpy as np
-from einops import rearrange, repeat
 import torch
+
+from einops import rearrange, repeat
+from torch import Tensor, nn
 from torch.utils.data import IterableDataset
-from torch import nn, Tensor
-import math
 
 
 class AbstractDataset(abc.ABC):
@@ -273,7 +275,6 @@ def evaluate(model, val_loader, device, num_eval_batches):
     count = 0
     # Loop over each batch from the validation set
     for batch in val_loader:
-
         # Copy data to device if needed
         batch = tuple(t.to(device) for t in batch)
 
@@ -408,7 +409,9 @@ if __name__ == "__main__":
         final_info_list = []
         for seed_offset in range(num_seeds[dataset]):
             print(f"Running {dataset} with seed offset {seed_offset}")
-            final_info, train_info, val_info, mdl_info = run(args.out_dir, dataset, seed_offset)
+            final_info, train_info, val_info, mdl_info = run(
+                args.out_dir, dataset, seed_offset
+            )
             all_results[f"{dataset}_{seed_offset}_final_info"] = final_info
             all_results[f"{dataset}_{seed_offset}_train_info"] = train_info
             all_results[f"{dataset}_{seed_offset}_val_info"] = val_info

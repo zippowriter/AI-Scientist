@@ -1,15 +1,18 @@
-import argparse
 import abc
+import argparse
+import json
+import os
 import random
+
 from itertools import permutations
 from typing import Set
-import os
-import json
+
 import numpy as np
-from einops import rearrange, repeat
 import torch
+
+from einops import rearrange, repeat
+from torch import Tensor, nn
 from torch.utils.data import IterableDataset
-from torch import nn, Tensor
 
 
 class AbstractDataset(abc.ABC):
@@ -198,14 +201,14 @@ class Transformer(torch.nn.Module):
             nn.LayerNorm(dim_model),
             nn.Linear(dim_model, output_size),
         )
-        
+
         self._initialize_weights()
 
     def _initialize_weights(self):
         for module in self.modules():
             if isinstance(module, (nn.Linear, nn.Embedding)):
                 nn.init.orthogonal_(module.weight)
-                if hasattr(module, 'bias') and module.bias is not None:
+                if hasattr(module, "bias") and module.bias is not None:
                     nn.init.constant_(module.bias, 0)
             elif isinstance(module, nn.LayerNorm):
                 nn.init.constant_(module.weight, 1.0)
@@ -284,7 +287,6 @@ def evaluate(model, val_loader, device, num_eval_batches):
     count = 0
     # Loop over each batch from the validation set
     for batch in val_loader:
-
         # Copy data to device if needed
         batch = tuple(t.to(device) for t in batch)
 

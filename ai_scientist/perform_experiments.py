@@ -3,7 +3,9 @@ import os.path as osp
 import shutil
 import subprocess
 import sys
+
 from subprocess import TimeoutExpired
+
 
 MAX_ITERS = 4
 MAX_RUNS = 5
@@ -142,7 +144,7 @@ def perform_experiments(idea, folder_name, coder, baseline_results) -> bool:
 
     current_iter = 0
     next_prompt = """
-Great job! Please modify `plot.py` to generate the most relevant plots for the final writeup. 
+Great job! Please modify `plot.py` to generate the most relevant plots for the final writeup.
 
 In particular, be sure to fill in the "labels" dictionary with the correct names for each run that you want to plot.
 

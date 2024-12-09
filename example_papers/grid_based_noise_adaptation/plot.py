@@ -1,10 +1,12 @@
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
 import json
 import os
 import os.path as osp
 import pickle
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # LOAD FINAL RESULTS:
 datasets = ["circle", "dino", "line", "moons"]
@@ -13,13 +15,13 @@ final_results = {}
 train_info = {}
 
 
-def smooth(x, window_len=10, window='hanning'):
-    s = np.r_[x[window_len - 1:0:-1], x, x[-2:-window_len - 1:-1]]
-    if window == 'flat':  # moving average
-        w = np.ones(window_len, 'd')
+def smooth(x, window_len=10, window="hanning"):
+    s = np.r_[x[window_len - 1 : 0 : -1], x, x[-2 : -window_len - 1 : -1]]
+    if window == "flat":  # moving average
+        w = np.ones(window_len, "d")
     else:
         w = getattr(np, window)(window_len)
-    y = np.convolve(w / w.sum(), s, mode='valid')
+    y = np.convolve(w / w.sum(), s, mode="valid")
     return y
 
 
@@ -30,10 +32,14 @@ for folder in folders:
         all_results = pickle.load(open(osp.join(folder, "all_results.pkl"), "rb"))
         train_info[folder] = all_results
 
+
 # Create a programmatic color palette
 def generate_color_palette(n):
-    cmap = plt.get_cmap('tab20')  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
+    cmap = plt.get_cmap(
+        "tab20"
+    )  # You can change 'tab20' to other colormaps like 'Set1', 'Set2', 'Set3', etc.
     return [mcolors.rgb2hex(cmap(i)) for i in np.linspace(0, 1, n)]
+
 
 # CREATE LEGEND
 labels = {
@@ -42,7 +48,7 @@ labels = {
     "run_2": "20x20 Grid",
     "run_3": "Multi-scale Grid",
     "run_4": "Multi-scale + L1 Reg",
-    "run_5": "Adjusted L1 Reg"
+    "run_5": "Adjusted L1 Reg",
 }
 
 # Only plot the runs that are both in the labels dictionary and in the final_results
@@ -100,7 +106,7 @@ plt.savefig("generated_images.png")
 plt.show()
 
 # Plot 3: Bar plot of evaluation metrics
-metrics = ['eval_loss', 'kl_divergence', 'training_time', 'inference_time']
+metrics = ["eval_loss", "kl_divergence", "training_time", "inference_time"]
 fig, axs = plt.subplots(2, 2, figsize=(16, 12))
 fig.suptitle("Evaluation Metrics Across Runs", fontsize=16)
 
@@ -110,31 +116,39 @@ for i, metric in enumerate(metrics):
     data = [final_results[run][dataset][metric] for run in runs for dataset in datasets]
     x = np.arange(len(datasets) * len(runs))
     axs[row, col].bar(x, data, color=colors)
-    axs[row, col].set_title(metric.replace('_', ' ').title())
+    axs[row, col].set_title(metric.replace("_", " ").title())
     axs[row, col].set_xticks(x + 0.5 * (len(runs) - 1))
     axs[row, col].set_xticklabels(datasets * len(runs), rotation=45)
-    axs[row, col].legend(labels.values(), loc='upper left', bbox_to_anchor=(1, 1))
+    axs[row, col].legend(labels.values(), loc="upper left", bbox_to_anchor=(1, 1))
 
 plt.tight_layout()
 plt.savefig("evaluation_metrics.png")
 plt.show()
 
 # Plot 4: Grid variance comparison (for runs 3 and 4)
-if 'run_3' in runs and 'run_4' in runs:
+if "run_3" in runs and "run_4" in runs:
     fig, axs = plt.subplots(1, 2, figsize=(14, 6))
     fig.suptitle("Grid Variance Comparison", fontsize=16)
 
-    for i, grid_type in enumerate(['coarse_grid_variance', 'fine_grid_variance']):
-        data_run3 = [final_results['run_3'][dataset][grid_type] for dataset in datasets]
-        data_run4 = [final_results['run_4'][dataset][grid_type] for dataset in datasets]
-        
+    for i, grid_type in enumerate(["coarse_grid_variance", "fine_grid_variance"]):
+        data_run3 = [final_results["run_3"][dataset][grid_type] for dataset in datasets]
+        data_run4 = [final_results["run_4"][dataset][grid_type] for dataset in datasets]
+
         x = np.arange(len(datasets))
         width = 0.35
-        
-        axs[i].bar(x - width/2, data_run3, width, label='Multi-scale Grid', color=colors[3])
-        axs[i].bar(x + width/2, data_run4, width, label='Multi-scale + L1 Reg', color=colors[4])
-        
-        axs[i].set_title(grid_type.replace('_', ' ').title())
+
+        axs[i].bar(
+            x - width / 2, data_run3, width, label="Multi-scale Grid", color=colors[3]
+        )
+        axs[i].bar(
+            x + width / 2,
+            data_run4,
+            width,
+            label="Multi-scale + L1 Reg",
+            color=colors[4],
+        )
+
+        axs[i].set_title(grid_type.replace("_", " ").title())
         axs[i].set_xticks(x)
         axs[i].set_xticklabels(datasets)
         axs[i].legend()
