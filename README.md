@@ -20,7 +20,7 @@ We provide all runs and data from our paper [here](https://drive.google.com/driv
 1. [DualScale Diffusion: Adaptive Feature Balancing for Low-Dimensional Generative Models](https://github.com/SakanaAI/AI-Scientist/blob/main/example_papers/adaptive_dual_scale_denoising.pdf)
 2. [Multi-scale Grid Noise Adaptation: Enhancing Diffusion Models For Low-dimensional Data](https://github.com/SakanaAI/AI-Scientist/blob/main/example_papers/grid_based_noise_adaptation.pdf)
 3. [GAN-Enhanced Diffusion: Boosting Sample Quality and Diversity](https://github.com/SakanaAI/AI-Scientist/blob/main/example_papers/gan_diffusion.pdf)
-4. [DualDiff: Enhancing Mode Capture in Low-dimensional Diffusion Models via Dual-expert Denoising](https://github.com/SakanaAI/AI-Scientist/tree/main/example_papers/dual_expert_denoiser.pdf) 
+4. [DualDiff: Enhancing Mode Capture in Low-dimensional Diffusion Models via Dual-expert Denoising](https://github.com/SakanaAI/AI-Scientist/tree/main/example_papers/dual_expert_denoiser.pdf)
 5. [StyleFusion: Adaptive Multi-style Generation in Character-Level Language Models](https://github.com/SakanaAI/AI-Scientist/blob/main/example_papers/multi_style_adapter.pdf)
 6. [Adaptive Learning Rates for Transformers via Q-Learning](https://github.com/SakanaAI/AI-Scientist/tree/main/example_papers/rl_lr_adaptation.pdf)
 7. [Unlocking Grokking: A Comparative Study of Weight Initialization Strategies in Transformer Models](https://github.com/SakanaAI/AI-Scientist/tree/main/example_papers/weight_initialization_grokking.pdf)
@@ -28,7 +28,7 @@ We provide all runs and data from our paper [here](https://drive.google.com/driv
 9. [Grokking Through Compression: Unveiling Sudden Generalization via Minimal Description Length](https://github.com/SakanaAI/AI-Scientist/tree/main/example_papers/mdl_grokking_correlation.pdf)
 10. [Accelerating Mathematical Insight: Boosting Grokking Through Strategic Data Augmentation](https://github.com/SakanaAI/AI-Scientist/tree/main/example_papers/data_augmentation_grokking.pdf)
 
-> **Note:**  
+> **Note:**
 > **Caution!** This codebase will execute LLM-written code. There are various risks and challenges associated with this autonomy, including the use of potentially dangerous packages, web access, and potential spawning of processes. Use at your own discretion. Please make sure to [containerize](#containerization) and restrict web access appropriately.
 
 <p align="center">
@@ -37,22 +37,31 @@ We provide all runs and data from our paper [here](https://drive.google.com/driv
 
 ## Table of Contents
 
-1. [Introduction](#introduction)
-2. [Requirements](#requirements)
-   - [Installation](#installation)
-   - [Supported Models and API Keys](#supported-models-and-api-keys)
-3. [Setting Up the Templates](#setting-up-the-templates)
-   - [NanoGPT Template](#nanogpt-template)
-   - [2D Diffusion Template](#2d-diffusion-template)
-   - [Grokking Template](#grokking-template)
-4. [Run AI Scientist Paper Generation Experiments](#run-ai-scientist-paper-generation-experiments)
-5. [Getting an LLM-Generated Paper Review](#getting-an-llm-generated-paper-review)
-6. [Making Your Own Template](#making-your-own-template)
-   - [Community-Contributed Templates](#community-contributed-templates)
-7. [Template Resources](#template-resources)
-8. [Citing The AI Scientist](#citing-the-ai-scientist)
-9. [Frequently Asked Questions](#frequently-asked-questions)
-10. [Containerization](#containerization)
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+- [Requirements](#requirements)
+  - [Installation](#installation)
+  - [Supported Models and API Keys](#supported-models-and-api-keys)
+    - [OpenAI API (GPT-4o, GPT-4o-mini, o1 models)](#openai-api-gpt-4o-gpt-4o-mini-o1-models)
+    - [Anthropic API (Claude Sonnet 3.5)](#anthropic-api-claude-sonnet-35)
+      - [Claude Models via Bedrock](#claude-models-via-bedrock)
+      - [Claude Models via Vertex AI](#claude-models-via-vertex-ai)
+    - [DeepSeek API (DeepSeek-Coder-V2)](#deepseek-api-deepseek-coder-v2)
+    - [OpenRouter API (Llama3.1)](#openrouter-api-llama31)
+    - [Semantic Scholar API (Literature Search)](#semantic-scholar-api-literature-search)
+- [Setting Up the Templates](#setting-up-the-templates)
+  - [NanoGPT Template](#nanogpt-template)
+  - [2D Diffusion Template](#2d-diffusion-template)
+  - [Grokking Template](#grokking-template)
+- [Run AI Scientist Paper Generation Experiments](#run-ai-scientist-paper-generation-experiments)
+- [Getting an LLM-Generated Paper Review](#getting-an-llm-generated-paper-review)
+- [Making Your Own Template](#making-your-own-template)
+  - [Community-Contributed Templates](#community-contributed-templates)
+- [Template Resources](#template-resources)
+- [Citing The AI Scientist](#citing-the-ai-scientist)
+- [Frequently Asked Questions](#frequently-asked-questions)
+- [Containerization](#containerization)
+- [Star History](#star-history)
 
 ## Introduction
 
